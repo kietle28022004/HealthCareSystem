@@ -1,0 +1,206 @@
+﻿@{
+    Layout = "_layoutDoctor";
+    ViewData["Title"] = "Doctor Profile";
+}
+
+<div class="main-content">
+    <partial name="_Header" />
+
+    <div class="content">
+        <div class="profile-content">
+
+            <div class="dashboard-card">
+                <div class="card-header-modern">
+                    <h5>Professional Profile</h5>
+                    <button class="edit-profile-btn" onclick="editBasicInfo()"><i class="fas fa-edit"></i></button>
+                </div>
+                <div class="card-content">
+                    <div class="profile-info">
+                        <div class="profile-avatar-section">
+                            <div class="profile-avatar-container">
+                                <img src="https://static.vecteezy.com/system/resources/previews/009/292/244/non_2x/default-avatar-icon-of-social-media-user-vector.jpg" alt="Profile" class="profile-avatar-xl" id="dispAvatar">
+                                <button class="avatar-edit-btn" onclick="alert('Coming soon')"><i class="fas fa-camera"></i></button>
+                            </div>
+                            <div class="profile-basic-info">
+                                <h4 id="dispFullName">Loading...</h4>
+                                <p class="text-primary fw-bold" id="dispSpecialtyHeader">--</p>
+                                <div class="profile-badges mt-2">
+                                    <span class="profile-badge verified"><i class="fas fa-user-md"></i> Verified Doctor</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="profile-details-grid">
+                            <div class="detail-card">
+                                <div class="detail-icon"><i class="fas fa-envelope"></i></div>
+                                <div class="detail-content">
+                                    <span class="detail-label">Email</span>
+                                    <span class="detail-value" id="dispEmail">...</span>
+                                </div>
+                            </div>
+                            <div class="detail-card">
+                                <div class="detail-icon"><i class="fas fa-phone"></i></div>
+                                <div class="detail-content">
+                                    <span class="detail-label">Phone Number</span>
+                                    <span class="detail-value" id="dispPhone">...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dashboard-card">
+                <div class="card-header-modern">
+                    <h5>Specialization & Certification</h5>
+                    <button class="edit-profile-btn" onclick="editProfessionalInfo()"><i class="fas fa-edit"></i></button>
+                </div>
+                <div class="card-content">
+                    <div class="health-info-grid">
+                        <div class="health-metric-card">
+                            <div class="metric-header">
+                                <div class="metric-icon bg-primary"><i class="fas fa-stethoscope"></i></div>
+                                <div class="metric-info"><h6>Specialty</h6><span class="metric-value" id="dispSpecialty">--</span></div>
+                            </div>
+                        </div>
+                        <div class="health-metric-card">
+                            <div class="metric-header">
+                                <div class="metric-icon bg-success"><i class="fas fa-id-card"></i></div>
+                                <div class="metric-info"><h6>License No.</h6><span class="metric-value" id="dispLicense">--</span></div>
+                            </div>
+                        </div>
+                        <div class="health-metric-card">
+                            <div class="metric-header">
+                                <div class="metric-icon bg-warning"><i class="fas fa-briefcase"></i></div>
+                                <div class="metric-info"><h6>Experience</h6><span class="metric-value" id="dispExp">--</span></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="health-details mt-4">
+                        <div class="health-section">
+                            <h6>Qualifications & Certifications</h6>
+                            <div class="health-tags" id="listQualifications">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dashboard-card">
+                <div class="card-header-modern">
+                    <h5>Biography</h5>
+                    <button class="edit-profile-btn" onclick="editBioInfo()"><i class="fas fa-edit"></i></button>
+                </div>
+                <div class="card-content">
+                    <p class="text-muted p-3" id="dispBio" style="white-space: pre-line; line-height: 1.6;">
+                        No biography information available.
+                    </p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="editBasicModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Professional Profile</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editBasicForm">
+                    <div class="mb-3">
+                        <label class="form-label">Full Name</label>
+                        <input type="text" class="form-control" id="editFullName">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Phone Number</label>
+                        <input type="tel" class="form-control" id="editPhone">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-control" id="editEmail" readonly style="background-color: #e9ecef;">
+                        <small class="text-muted">Email cannot be changed.</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveBasicInfo()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="editProfessionalModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Specialization</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editProfessionalForm">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Specialty</label>
+                            <input type="text" class="form-control" id="editSpecialty" placeholder="e.g. Cardiology">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">License Number</label>
+                            <input type="text" class="form-control" id="editLicense">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Experience (Years/Level)</label>
+                        <input type="text" class="form-control" id="editExperience" placeholder="e.g. 10 years">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Qualifications</label>
+                        <div class="health-tags-input" id="editQualificationsContainer" style="border: 1px solid #ced4da; padding: 10px; border-radius: 5px; min-height: 50px;">
+                        </div>
+                        <small class="text-muted">Double click to remove. Use 'Add' button inside.</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveProfessionalInfo()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="editBioModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Biography</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form>
+                    <div class="mb-3">
+                        <textarea class="form-control" id="editBioInput" rows="8" placeholder="Describe your background..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveBioInfo()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    window.AppConfig = {
+        apiBaseUrl: '@(ViewBag.ApiBaseUrl ?? "https://localhost:7293")',
+        userId: @(Context.Session.GetInt32("UserId") ?? 0),
+        token: '@Html.Raw(Context.Session.GetString("AccessToken") ?? "")',
+        userEmail: '@Html.Raw(Context.Session.GetString("Email") ?? "")'
+    };
+</script>
+<script src="~/js/doctor/profile.js?v=@DateTime.Now.Ticks"></script>

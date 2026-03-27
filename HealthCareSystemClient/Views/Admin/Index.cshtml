@@ -1,0 +1,124 @@
+﻿@*
+    For more information on enabling MVC for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
+*@
+@{
+    Layout = "_LayoutAdmin";
+    ViewData["Title"] = "Admin Dashboard";
+}
+<!-- Main Content -->
+<div class="main-content">
+    <!-- Header -->
+    <header class="header">
+        <h1 class="header-title">Admin Dashboard</h1>
+        <div class="search-container">
+            <i class="fas fa-search search-icon"></i>
+            <input type="text" class="search-input" placeholder="Search..." id="searchInput">
+        </div>
+        <div class="header-actions">
+            <button class="notification-btn">
+                <i class="fas fa-bell"></i>
+                <span class="notification-badge">5</span>
+            </button>
+            <div class="user-profile">
+                <img src="/placeholder.svg?height=32&width=32" alt="Admin" class="user-avatar">
+                <div class="user-info">
+                    <h6 id="adminName">Admin User</h6>
+                    <p>Administrator</p>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Content -->
+    <div class="content">
+        <!-- Statistics Cards -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon blue">
+                    <i class="fas fa-users"></i>
+                </div>
+                <div class="stat-content">
+                    <h3 id="totalUsers">14</h3>
+                    <p>Total Users</p>                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon green">
+                    <i class="fas fa-calendar-check"></i>
+                </div>
+                <div class="stat-content">
+                    <h3 id="totalAppointments">10</h3>
+                    <p>Total Appointments</p>
+                    <small class="text-success">+8% from last month</small>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon cyan">
+                    <i class="fas fa-dollar-sign"></i>
+                </div>
+                <div class="stat-content">
+                    <h3 id="totalRevenue">$89,432</h3>
+                    <p>Monthly Revenue</p>
+                    <small class="text-success">+15% from last month</small>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon yellow">
+                    <i class="fas fa-newspaper"></i>
+                </div>
+                <div class="stat-content">
+                    <h3 id="totalArticles">156</h3>
+                    <p>Published Articles</p>
+                    <small class="text-info">+5 this week</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="dashboard-main-grid">
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <h5 class="card-title">User Registration Trends</h5>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            Last 30 Days
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#" onclick="updateChart('users', 7)">Last 7 Days</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="updateChart('users', 30)">Last 30 Days</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="updateChart('users', 90)">Last 90 Days</a></li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="card-content">
+                    <canvas id="userChart" height="300"></canvas>
+                </div>
+            </div>
+
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <h5 class="card-title">Appointment Statistics</h5>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            This Month
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#" onclick="updateChart('appointments', 'week')">This Week</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="updateChart('appointments', 'month')">This Month</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="updateChart('appointments', 'year')">This Year</a></li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="card-content">
+                    <canvas id="appointmentChart" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+       
+</div>
+
+<script src="~/js/admin/admin-dashboard.js"></script>

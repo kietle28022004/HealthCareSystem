@@ -1,0 +1,48 @@
+﻿@*
+    For more information on enabling MVC for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
+*@
+@{
+    Layout = "_LayoutUser";
+    ViewData["Title"] = "Doctors";
+    var apiBaseUrl = "https://localhost:7293";
+}
+<script>
+    const API_BASE_URL = "@apiBaseUrl";
+</script>
+<!-- Main Content -->
+<div class="main-content">
+    <!-- Header -->
+    <partial name="_Header" />
+
+    <!-- Content -->
+    <div class="content">
+        <!-- Doctors Grid -->
+        <div class="dashboard-grid">
+            <div class="dashboard-card span-2">
+                <div class="card-header">
+                    <h5 class="card-title">Available Doctors</h5>
+                </div>
+                <div class="card-content">
+                    <div class="doctors-grid" id="doctorsGrid">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <h5 class="card-title">Filter by Specialty</h5>
+                </div>
+                <div class="card-content">
+                    <div class="specialty-filters" id="specialtyFilters">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="~/js/user/doctors.js"></script>
