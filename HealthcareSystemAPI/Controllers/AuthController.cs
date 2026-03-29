@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Services.Interface;
 using Services.Services;
+using System.Security.Claims;
 
 namespace HealthcareSystemAPI.Controllers
 {
@@ -77,6 +78,20 @@ namespace HealthcareSystemAPI.Controllers
         public IActionResult Logout()
         {
             return Ok(new { Success = true, Message = "Logout Successfully!!!" });
+        }
+
+        // GET: api/auth/me - Refresh session data (avatar, name, etc.)
+        [Authorize]
+        [HttpGet("me")]
+        public async Task<IActionResult> GetCurrentUser()
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdClaim)) return Unauthorized();
+            if (!int.TryParse(userIdClaim, out var userId)) return Unauthorized();
+
+            var result = await _service.GetLoginResponseAsync(userId);
+            if (result == null) return NotFound();
+            return Ok(result);
         }
     }
 }

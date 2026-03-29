@@ -3,13 +3,19 @@
 @{
     Layout = "_LayoutUser";
     ViewData["Title"] = "AI Assistant";
-    // KHAI BÁO BASE URL CỦA WEB API TẠI ĐÂY
     var apiBaseUrl = "https://localhost:7293";
+    var accessToken = Context.Session.GetString("AccessToken") ?? "";
 }
 
 <script>
-    const API_BASE_URL = "@apiBaseUrl";
-    const CURRENT_USER_ID = @Model.UserId;
+    // Global config for ai-chat.js
+    window.AppConfig = window.AppConfig || {};
+    window.AppConfig.apiBaseUrl = '@Html.Raw(apiBaseUrl)';
+    window.AppConfig.userId = @Model.UserId;
+    window.AppConfig.userToken = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(accessToken));
+
+    const API_BASE_URL = window.AppConfig.apiBaseUrl;
+    const CURRENT_USER_ID = window.AppConfig.userId;
 </script>
 
 <div class="main-content">
@@ -21,7 +27,7 @@
                 <span class="notification-badge">3</span>
             </button>
             <a asp-controller="User" asp-action="Profile" style="text-decoration: none;">
-                <div class="user-profile" onclick="window.location.href='profile.html'">
+                <div class="user-profile" onclick="window.location.href='/User/Profile'">
                     <img src="@Model.AvatarUrl" alt="User" class="user-avatar">
                     <div class="user-info">
                         <p id="userId" style="display: none;">@Model.UserId</p>
@@ -177,10 +183,9 @@
         $.ajax({
             url: deleteUrl,
             type: 'DELETE',
-            // Cần THÊM Access Token nếu API yêu cầu xác thực
-            // headers: {
-            //     'Authorization': 'Bearer ' + sessionStorage.getItem('AccessToken')
-            // },
+            headers: {
+                'Authorization': 'Bearer ' + (window.AppConfig?.userToken || '')
+            },
             success: function(response) {
                 alert("Đã xóa lịch sử chat thành công!");
                 $("#aiChatMessages").empty(); // Xóa tin nhắn khỏi giao diện

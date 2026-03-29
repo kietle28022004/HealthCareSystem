@@ -86,6 +86,30 @@ namespace HealthcareSystemAPI.Controllers
 
             return Ok(result);
         }
+
+        // POST: api/conversation/mark-all-read
+        [HttpPost("mark-all-read")]
+        public async Task<IActionResult> MarkAllRead()
+        {
+            var userIdClaim = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdClaim)) return Unauthorized();
+            var userId = int.Parse(userIdClaim);
+
+            var conversations = await _conversationService.GetByUserIdAsync(userId);
+
+            foreach (var convo in conversations)
+            {
+                var unread = convo.Messages
+                    .Where(m => m.SenderId != userId && (m.IsRead == null || m.IsRead == false))
+                    .ToList();
+                if (unread.Any())
+                {
+                    await _messageService.MarkAsReadAsync(unread);
+                }
+            }
+
+            return Ok();
+        }
     }
 }
 

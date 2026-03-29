@@ -137,6 +137,7 @@ namespace HealthCareSystemClient.Controllers
                     HttpContext.Session.SetString("FullName", loginResponse.FullName ?? loginResponse.Email);
                     HttpContext.Session.SetString("AccessToken", loginResponse.Token);
                     HttpContext.Session.SetString("TokenExpiry", loginResponse.ExpiresAt.ToString("O"));
+                    HttpContext.Session.SetString("AvatarUrl", loginResponse.AvatarUrl ?? "/images/default-user.png");
 
                     var role = loginResponse.Role?.Trim().ToLower();
 

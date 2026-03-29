@@ -247,3 +247,84 @@ function setValue(id, val) {
     if (el) el.value = (val !== null && val !== undefined) ? val : '';
 }
 function getValue(id) { return document.getElementById(id)?.value; }
+
+async function changeAvatar() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/jpeg,image/png,image/gif,image/webp';
+
+    input.addEventListener('change', async () => {
+        const file = input.files && input.files.length > 0 ? input.files[0] : null;
+        if (!file) return;
+
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        if (!allowedTypes.includes(file.type)) {
+            alert('Unsupported image format. Use jpg, jpeg, png, gif, or webp.');
+            return;
+        }
+
+        const maxBytes = 5 * 1024 * 1024;
+        if (file.size > maxBytes) {
+            alert('Image size must be less than 5MB.');
+            return;
+        }
+
+        const avatarBtn = document.querySelector('.avatar-edit-btn');
+        try {
+            if (avatarBtn) {
+                avatarBtn.disabled = true;
+                avatarBtn.style.opacity = '0.6';
+            }
+
+            const formData = new FormData();
+            formData.append('userId', String(CONFIG.userId));
+            formData.append('file', file);
+
+            const res = await fetch(`${CONFIG.apiBaseUrl}/api/doctor/avatar`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${CONFIG.token}` },
+                body: formData
+            });
+
+            if (!res.ok) {
+                const txt = await res.text();
+                throw new Error(txt || 'Failed to upload avatar');
+            }
+
+            const data = await res.json();
+            if (!data.avatarUrl) {
+                throw new Error('Upload succeeded but no avatar URL returned.');
+            }
+
+            // Update profile page avatar
+            if (currentProfileData) currentProfileData.avatarUrl = data.avatarUrl;
+            const dAvatar = document.getElementById('dispAvatar');
+            if (dAvatar) dAvatar.src = data.avatarUrl;
+
+            // Refresh header avatar from API (bypass Session cache)
+            try {
+                const meRes = await fetch(`${CONFIG.apiBaseUrl}/api/auth/me`, {
+                    headers: { 'Authorization': `Bearer ${CONFIG.token}` }
+                });
+                if (meRes.ok) {
+                    const me = await meRes.json();
+                    const hAvatarImg = document.getElementById('headerAvatarImg');
+                    if (hAvatarImg && me.avatarUrl) {
+                        hAvatarImg.src = me.avatarUrl;
+                    }
+                }
+            } catch (e) {
+                // Fallback: reload page
+                location.reload();
+                return;
+            }
+
+            alert('Avatar updated successfully!');
+        } catch (err) {
+            console.error(err);
+            alert('Failed to upload avatar: ' + (err.message || 'Unknown error'));
+        }
+    });
+
+    input.click();
+}

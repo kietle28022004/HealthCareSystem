@@ -128,6 +128,12 @@ CREATE TABLE Payments (
     PatientUserId INT NOT NULL,
     Amount DECIMAL(10,2) NOT NULL,
     PaymentMethod NVARCHAR(50),
+    AppointmentId INT NULL,
+    BookingDraftJson NVARCHAR(MAX) NULL,
+    PaymentLink NVARCHAR(500) NULL,
+    PaymentLinkId NVARCHAR(100) NULL,
+    Status NVARCHAR(20) NULL,
+    TransactionId NVARCHAR(100) NULL,
     CreatedAt DATETIME DEFAULT GETDATE(),
 	UpdatedAt DATETIME DEFAULT GETDATE(),
     FOREIGN KEY (PatientUserId) REFERENCES Users(UserId)

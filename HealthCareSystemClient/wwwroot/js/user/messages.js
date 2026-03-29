@@ -36,6 +36,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     await loadConversations();
     await initializeSignalR();
+    await loadDoctorOptions();
     setupEventListeners();
 });
 
@@ -103,7 +104,7 @@ function renderConversations() {
     }
 
     container.innerHTML = conversations.map(c => `
-        <div class="conversation-item" onclick="selectConversation(${c.conversationId})">
+        <div class="conversation-item" data-conversation-id="${c.conversationId}" onclick="selectConversation(${c.conversationId}, this)">
             <div class="conversation-avatar">
                 <img src="${c.otherUserAvatar || '/placeholder.svg?height=32&width=32'}" alt="Avatar">
             </div>
@@ -118,10 +119,15 @@ function renderConversations() {
     `).join('');
 }
 
-async function selectConversation(conversationId) {
+async function selectConversation(conversationId, clickedElement = null) {
     // Highlight UI
     document.querySelectorAll('.conversation-item').forEach(i => i.classList.remove('active'));
-    event.currentTarget.classList.add('active');
+    if (clickedElement) {
+        clickedElement.classList.add('active');
+    } else {
+        const selected = document.querySelector(`.conversation-item[data-conversation-id="${conversationId}"]`);
+        if (selected) selected.classList.add('active');
+    }
 
     currentConversation = conversations.find(c => c.conversationId === conversationId);
     if (!currentConversation) return;
@@ -145,6 +151,72 @@ async function selectConversation(conversationId) {
     // Clear unread locally
     currentConversation.unreadCount = 0;
     renderConversations();
+}
+
+async function loadDoctorOptions() {
+    const select = document.getElementById('newConversationDoctorSelect');
+    if (!select) {
+        return;
+    }
+
+    try {
+        const res = await fetch(`${CONFIG.apiBaseUrl}/api/doctor/all`);
+        if (!res.ok) {
+            throw new Error(`Failed to load doctors: ${res.status}`);
+        }
+
+        const doctors = await res.json();
+        if (!Array.isArray(doctors) || doctors.length === 0) {
+            select.innerHTML = '<option value="">No doctor found</option>';
+            return;
+        }
+
+        select.innerHTML = '<option value="">Select a doctor</option>' + doctors.map((d) => {
+            const id = d.userId || d.id;
+            const name = d.fullName || d.name || `Doctor ${id}`;
+            const specialty = d.specialtyName || d.specialty?.name || 'General';
+            return `<option value="${id}">${name} - ${specialty}</option>`;
+        }).join('');
+    } catch (error) {
+        console.error('Failed to load doctor options:', error);
+        select.innerHTML = '<option value="">Failed to load doctors</option>';
+    }
+}
+
+async function openConversationWithDoctor(doctorUserId) {
+    try {
+        const res = await fetch(`${CONFIG.apiBaseUrl}/api/conversation/create-or-get`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${CONFIG.userToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                patientUserId: Number(CONFIG.userId),
+                doctorUserId: Number(doctorUserId)
+            })
+        });
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(errorText || `Create/Get conversation failed with status ${res.status}`);
+        }
+
+        const data = await res.json();
+        const conversationId = Number(data?.conversationId || 0);
+        if (conversationId <= 0) {
+            throw new Error('Invalid conversationId returned by API.');
+        }
+
+        if (!conversations.some(c => c.conversationId === conversationId)) {
+            await loadConversations();
+        }
+
+        await selectConversation(conversationId);
+    } catch (error) {
+        console.error('Failed to open conversation with doctor:', error);
+        alert('Cannot open chat with this doctor right now. Please try again.');
+    }
 }
 
 async function loadMessages(conversationId) {
@@ -265,9 +337,21 @@ async function fetchTwilioToken(roomName) {
         const res = await fetch(`${CONFIG.apiBaseUrl}/api/twilio/token?roomName=${encodeURIComponent(roomName)}`, {
             headers: { 'Authorization': `Bearer ${CONFIG.userToken}` }
         });
-        return await res.json();
+
+        const data = await res.json();
+        if (!res.ok) {
+            const detail = data?.message || data?.hint || `Twilio token API failed: ${res.status}`;
+            throw new Error(detail);
+        }
+
+        if (!data?.token) {
+            throw new Error('Twilio token response does not contain token.');
+        }
+
+        return data;
     } catch (e) {
-        return null;
+        console.error('fetchTwilioToken error:', e);
+        return { error: e.message || 'Cannot fetch Twilio token' };
     }
 }
 
@@ -296,8 +380,8 @@ async function startVideoCall() {
 
     // 2. Get Token
     const tokenData = await fetchTwilioToken(roomName);
-    if (!tokenData) {
-        document.getElementById('connectionStatus').innerText = "Token Error";
+    if (!tokenData || !tokenData.token) {
+        document.getElementById('connectionStatus').innerText = tokenData?.error || "Token Error";
         return;
     }
 
@@ -504,7 +588,32 @@ function setupEventListeners() {
 }
 
 // Placeholder Functions
-function startNewConversation() { alert('Coming soon!'); }
+function startNewConversation() {
+    const modalEl = document.getElementById('newConversationModal');
+    if (!modalEl) {
+        return;
+    }
+
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
+}
+
+function createConversationFromSelection() {
+    const select = document.getElementById('newConversationDoctorSelect');
+    const doctorUserId = Number(select?.value || 0);
+    if (!doctorUserId) {
+        alert('Please select a doctor.');
+        return;
+    }
+
+    const modalEl = document.getElementById('newConversationModal');
+    const modal = modalEl ? bootstrap.Modal.getInstance(modalEl) : null;
+    if (modal) {
+        modal.hide();
+    }
+
+    openConversationWithDoctor(doctorUserId);
+}
 function startVoiceCall() { alert('Voice call coming soon!'); }
 function viewDoctorProfile() { alert('Profile coming soon!'); }
 

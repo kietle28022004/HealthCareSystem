@@ -3,6 +3,7 @@ using BusinessObjects.DataTransferObjects.PaymentDTOs.Shared;
 using BusinessObjects.Domain;
 using DataAccessObjects.DAO;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Services.Interface;
 using System;
 using System.Collections.Generic;
@@ -22,6 +23,7 @@ namespace Services.Services
         private readonly AppointmentDAO _appointmentDAO;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IConfiguration _configuration;
+        private readonly ILogger<PaymentService> _logger;
         private readonly string _payOSClientId;
         private readonly string _payOSApiKey;
         private readonly string _payOSChecksumKey;
@@ -32,12 +34,14 @@ namespace Services.Services
             PaymentDAO paymentDAO,
             AppointmentDAO appointmentDAO,
             IHttpClientFactory httpClientFactory,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            ILogger<PaymentService> logger)
         {
             _paymentDAO = paymentDAO;
             _appointmentDAO = appointmentDAO;
             _httpClientFactory = httpClientFactory;
             _configuration = configuration;
+            _logger = logger;
             _payOSClientId = _configuration["PayOS:ClientId"] ?? "";
             _payOSApiKey = _configuration["PayOS:ApiKey"] ?? "";
             _payOSChecksumKey = _configuration["PayOS:ChecksumKey"] ?? "";
@@ -58,7 +62,13 @@ namespace Services.Services
             var orderCode = GenerateOrderCode();
             var amountInVnd = (int)Math.Round(request.Amount, MidpointRounding.AwayFromZero);
 
-            var description = BuildPayOSDescription(request.Description ?? $"Booking #{request.PatientUserId}");
+            // Use unique description by including orderCode to avoid PayOS duplicate detection
+            var description = $"Dat lich #{orderCode}";
+
+            _logger?.LogInformation(
+                "Creating upfront payment: OrderCode={OrderCode}, Amount={Amount}, Patient={PatientId}, Doctor={DoctorId}",
+                orderCode, amountInVnd, request.PatientUserId,
+                request.BookingDraft?.DoctorUserId);
 
             var paymentLinkResponse = await CreatePayOSPaymentLinkAsync(
                 orderCode: orderCode,
@@ -74,6 +84,10 @@ namespace Services.Services
                 ? null
                 : JsonSerializer.Serialize(request.BookingDraft);
 
+            _logger?.LogInformation(
+                "PayOS payment link created: OrderCode={OrderCode}, CheckoutUrl={Url}, PaymentLinkId={PaymentLinkId}",
+                orderCode, paymentLink.CheckoutUrl, paymentLink.PaymentLinkId);
+
             var payment = new Payment
             {
                 PatientUserId = request.PatientUserId,
@@ -88,6 +102,8 @@ namespace Services.Services
             };
 
             var createdPayment = await _paymentDAO.CreateAsync(payment);
+            _logger?.LogInformation("Payment record created: PaymentId={PaymentId}, OrderCode={OrderCode}",
+                createdPayment.PaymentId, orderCode);
             return MapToResponse(createdPayment);
         }
 
@@ -96,7 +112,7 @@ namespace Services.Services
             var orderCode = GenerateOrderCode();
             var amountInVnd = (int)Math.Round(request.Amount, MidpointRounding.AwayFromZero);
 
-            var description = BuildPayOSDescription(request.Description ?? $"Payment for appointment #{request.AppointmentId}");
+            var description = $"Thanh toan #{orderCode}";
 
             var paymentLinkResponse = await CreatePayOSPaymentLinkAsync(
                 orderCode: orderCode,
@@ -169,15 +185,24 @@ namespace Services.Services
                 payment.Status = "PAID";
                 payment.TransactionId = callback.Data.Reference;
                 payment.UpdatedAt = DateTime.UtcNow;
-                await CreateAppointmentFromDraftAsync(payment);
+                try
+                {
+                    // CreateAppointmentFromDraftAsync handles its own UpdateAsync
+                    await CreateAppointmentFromDraftAsync(payment);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "Webhook: Failed to create appointment from draft for payment {PaymentId}", payment.PaymentId);
+                    // Save payment status even if appointment creation failed
+                    await _paymentDAO.UpdateAsync(payment);
+                }
             }
             else
             {
                 payment.Status = "FAILED";
                 payment.UpdatedAt = DateTime.UtcNow;
+                await _paymentDAO.UpdateAsync(payment);
             }
-
-            await _paymentDAO.UpdateAsync(payment);
             return true;
         }
 
@@ -187,6 +212,7 @@ namespace Services.Services
             var paymentInfo = await GetPayOSPaymentInfoAsync(paymentLinkId);
             if (paymentInfo == null || paymentInfo.Data == null)
             {
+                _logger?.LogWarning("PayOS payment info not found for paymentLinkId: {PaymentLinkId}", paymentLinkId);
                 return null;
             }
 
@@ -194,6 +220,7 @@ namespace Services.Services
             var payment = await _paymentDAO.GetByPaymentLinkIdAsync(paymentLinkId);
             if (payment == null)
             {
+                _logger?.LogWarning("Payment record not found in DB for paymentLinkId: {PaymentLinkId}", paymentLinkId);
                 return null;
             }
 
@@ -203,8 +230,18 @@ namespace Services.Services
                 payment.Status = "PAID";
                 payment.TransactionId = paymentInfo.Data.TransactionId;
                 payment.UpdatedAt = DateTime.UtcNow;
-                await CreateAppointmentFromDraftAsync(payment);
-                await _paymentDAO.UpdateAsync(payment);
+
+                try
+                {
+                    // CreateAppointmentFromDraftAsync handles its own UpdateAsync
+                    await CreateAppointmentFromDraftAsync(payment);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "Failed to create appointment from draft for payment {PaymentId}", payment.PaymentId);
+                    // Ensure payment status is saved even if appointment creation fails
+                    await _paymentDAO.UpdateAsync(payment);
+                }
             }
 
             return MapToResponse(payment);
@@ -251,7 +288,9 @@ namespace Services.Services
             if (!response.IsSuccessStatusCode)
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
-                throw new Exception($"PayOS API error: {errorContent}");
+                _logger?.LogError("PayOS API HTTP error: StatusCode={StatusCode}, Body={Body}, OrderCode={OrderCode}",
+                    response.StatusCode, errorContent, orderCode);
+                throw new Exception($"PayOS API error (HTTP {(int)response.StatusCode}): {errorContent}");
             }
 
             var jsonContent = await response.Content.ReadAsStringAsync();
@@ -271,6 +310,8 @@ namespace Services.Services
             
             if (!IsPayOSSuccessCode(codeString))
             {
+                _logger?.LogError("PayOS business error: Code={Code}, Desc={Desc}, OrderCode={OrderCode}",
+                    codeString, desc, orderCode);
                 throw new Exception($"PayOS error ({codeString}): {desc}");
             }
             
@@ -427,6 +468,7 @@ namespace Services.Services
         {
             if (payment.AppointmentId.HasValue || string.IsNullOrWhiteSpace(payment.BookingDraftJson))
             {
+                _logger?.LogDebug("Skipping appointment creation - already has appointmentId or no draft");
                 return;
             }
 
@@ -435,17 +477,45 @@ namespace Services.Services
             {
                 draft = JsonSerializer.Deserialize<BookingDraftDto>(payment.BookingDraftJson);
             }
-            catch
+            catch (Exception ex)
             {
+                _logger?.LogError(ex, "Failed to deserialize BookingDraftJson for payment {PaymentId}", payment.PaymentId);
                 return;
             }
 
             if (draft == null)
             {
+                _logger?.LogWarning("BookingDraftDto is null after deserialization for payment {PaymentId}", payment.PaymentId);
                 return;
             }
 
-            var appointmentDateTime = draft.AppointmentDate.Date + draft.AppointmentTime;
+            // Validate required fields
+            if (draft.DoctorUserId == 0)
+            {
+                _logger?.LogError("Invalid BookingDraft - DoctorUserId is 0 for payment {PaymentId}", payment.PaymentId);
+                return;
+            }
+
+            if (draft.AppointmentDate == default || draft.AppointmentTime == default)
+            {
+                _logger?.LogError("Invalid BookingDraft - AppointmentDate or AppointmentTime is invalid for payment {PaymentId}. Date={Date}, Time={Time}",
+                    payment.PaymentId, draft.AppointmentDate, draft.AppointmentTime);
+                return;
+            }
+
+            DateTime appointmentDateTime;
+            try
+            {
+                appointmentDateTime = draft.AppointmentDate.Date + draft.AppointmentTime;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to combine AppointmentDate + AppointmentTime for payment {PaymentId}", payment.PaymentId);
+                return;
+            }
+
+            _logger?.LogInformation("Creating appointment from draft for payment {PaymentId}: Doctor={DoctorId}, Patient={PatientId}, DateTime={DateTime}",
+                payment.PaymentId, draft.DoctorUserId, payment.PatientUserId, appointmentDateTime);
 
             var appointment = new Appointment
             {
@@ -459,8 +529,14 @@ namespace Services.Services
             };
 
             var createdAppointment = await _appointmentDAO.CreateAsync(appointment);
+
             payment.AppointmentId = createdAppointment.AppointmentId;
             payment.BookingDraftJson = null;
+
+            await _paymentDAO.UpdateAsync(payment);
+
+            _logger?.LogInformation("Successfully created appointment {AppointmentId} from payment {PaymentId}",
+                createdAppointment.AppointmentId, payment.PaymentId);
         }
 
         // PayOS API Response Models

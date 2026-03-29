@@ -223,12 +223,12 @@ function startConsultation(appointmentId) {
 
 function viewPatient(patientId) {
     console.log("Viewing patient:", patientId)
-    window.location.href = `doctor-patients.html?id=${patientId}`
+    window.location.href = `/Doctor/Patients?id=${patientId}`
 }
 
 function viewPatientDetails(patientId) {
     console.log("Viewing patient details:", patientId)
-    window.location.href = `doctor-patients.html?id=${patientId}`
+    window.location.href = `/Doctor/Patients?id=${patientId}`
 }
 
 // Utility functions
@@ -252,6 +252,6 @@ function showNotification(message, type = "info") {
 function logout() {
     if (confirm("Are you sure you want to logout?")) {
         localStorage.clear()
-        window.location.href = "login.html"
+        window.location.href = "/Login"
     }
 }

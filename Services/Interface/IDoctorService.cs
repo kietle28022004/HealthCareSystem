@@ -16,5 +16,6 @@ namespace Services.Interface
         Task<bool> UpdateDoctorProfileAsync(UpdateDoctorProfileDTO doctorDto);
         Task<List<Doctor>> GetBySpecialtyAsync(int specialtyId);
         Task<IEnumerable<PatientProfileDTO>> GetPatientsByDoctorId(int doctorUserId);
+        Task<string?> UploadAvatarAsync(int userId, Stream imageStream, string fileName);
     }
 }

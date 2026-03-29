@@ -111,7 +111,15 @@
                                     </div>
                                 </div>
                                 <div class="time-off-actions">
-                                    <button class="btn btn-sm btn-outline-secondary" onclick="editTimeOff(@timeOff.TimeOffId)" type="button">
+                                    <button class="btn btn-sm btn-outline-secondary"
+                                            data-timeoff-id="@timeOff.TimeOffId"
+                                            data-type="@timeOff.Type"
+                                            data-title="@timeOff.Title"
+                                            data-start-date="@timeOff.StartDate.ToString("yyyy-MM-dd")"
+                                            data-end-date="@timeOff.EndDate.ToString("yyyy-MM-dd")"
+                                            data-reason="@timeOff.Reason"
+                                            onclick="editTimeOffFromButton(this)"
+                                            type="button">
                                         <i class="fas fa-edit"></i>
                                     </button>
                                     <button class="btn btn-sm btn-outline-danger" onclick="deleteTimeOff(@timeOff.TimeOffId)" type="button">
@@ -190,4 +198,7 @@
     </div>
 </div>
 
-<script src="~/js/doctor/schedule.js"></script>
+<script>
+    document.body.setAttribute('data-doctor-id', '@Model.DoctorId');
+</script>
+<script src="~/js/doctor/schedule.js?v=@DateTime.Now.Ticks"></script>

@@ -4,6 +4,7 @@
 @{
     Layout = "_LayoutUser";
     ViewData["Title"] = "Messages";
+    var accessToken = Context.Session.GetString("AccessToken") ?? "";
 }
 
 <div class="main-content">
@@ -76,6 +77,27 @@
     </div>
 </div>
 
+<div class="modal fade" id="newConversationModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Start New Conversation</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <label for="newConversationDoctorSelect" class="form-label">Select doctor</label>
+                <select id="newConversationDoctorSelect" class="form-select">
+                    <option value="">Loading doctors...</option>
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="createConversationFromSelection()">Start Chat</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="videoCallModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-xl modal-dialog-centered">
         <div class="modal-content" style="background-color: #202124; border-radius: 15px; overflow: hidden; color: white;">
@@ -122,10 +144,10 @@
 
 <script>
     window.AppConfig = {
-        apiBaseUrl: '@(ViewBag.ApiBaseUrl ?? "https://localhost:7293")', // Check đúng Port API
+        apiBaseUrl: 'https://localhost:7293',
         userId: @(Context.Session.GetInt32("UserId") ?? 0),
-        userToken: @Html.Raw(Json.Serialize(Context.Session.GetString("AccessToken") ?? "")),
-        userEmail: @Html.Raw(Json.Serialize(Context.Session.GetString("Email") ?? "Guest"))
+        userToken: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(accessToken)),
+        userEmail: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Context.Session.GetString("Email") ?? "Guest"))
     };
 
     console.log('AppConfig initialized:', window.AppConfig);

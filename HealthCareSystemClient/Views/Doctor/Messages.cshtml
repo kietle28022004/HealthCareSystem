@@ -4,6 +4,7 @@
 @{
     Layout = "_layoutDoctor";
     ViewData["Title"] = "Messages";
+    var accessToken = Context.Session.GetString("AccessToken") ?? "";
 }
 
 <div class="main-content">
@@ -108,16 +109,37 @@
     </div>
 </div>
 
+<div class="modal fade" id="newConversationModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Start New Conversation</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <label for="newConversationPatientSelect" class="form-label">Select patient</label>
+                <select id="newConversationPatientSelect" class="form-select">
+                    <option value="">Loading patients...</option>
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="createConversationFromSelection()">Start Chat</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="~/microsoft/signalr/dist/browser/signalr.min.js"></script>
 <script src="https://sdk.twilio.com/js/video/releases/2.27.0/twilio-video.min.js"></script>
 
 <script>
     // Cấu hình AppConfig chuẩn
     window.AppConfig = {
-        apiBaseUrl: '@(ViewBag.ApiBaseUrl ?? "https://localhost:7293")',
+        apiBaseUrl: 'https://localhost:7293',
         userId: @(Context.Session.GetInt32("UserId") ?? 0),
-        userToken: @Html.Raw(Json.Serialize(Context.Session.GetString("AccessToken") ?? "")),
-        userEmail: @Html.Raw(Json.Serialize(Context.Session.GetString("Email") ?? "Doctor"))
+        userToken: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(accessToken)),
+        userEmail: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Context.Session.GetString("Email") ?? "Doctor"))
     };
 </script>
 

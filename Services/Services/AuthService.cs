@@ -31,5 +31,10 @@ namespace Services.Services
         {
             return await _repository.LoginGoogleAsync(request);
         }
+
+        public async Task<LoginResponse?> GetLoginResponseAsync(int userId)
+        {
+            return await _repository.GetLoginResponseAsync(userId);
+        }
     }
 }

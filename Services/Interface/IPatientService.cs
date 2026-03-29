@@ -13,5 +13,6 @@ namespace Services.Interface
         Task<bool> UpdatePatientProfileAsync(UpdatePatientProfileDTO updatePatientDto);
         Task<bool> CreatePatientProfileAsync(CreatePatientDTO patientDto);
         Task<bool> UpdateHealthInfoAsync(UpdateHealthInfoDTO dto);
+        Task<string?> UploadAvatarAsync(int userId, Stream imageStream, string fileName);
     }
 }

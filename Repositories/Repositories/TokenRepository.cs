@@ -27,6 +27,12 @@ namespace Repositories.Repositories
             var secretKey = jwtSettings["SecretKey"];
             var issuer = jwtSettings["Issuer"];
             var audience = jwtSettings["Audience"];
+            var expiryInHoursRaw = jwtSettings["ExpiryInHours"];
+
+            if (!int.TryParse(expiryInHoursRaw, out var expiryInHours) || expiryInHours <= 0)
+            {
+                expiryInHours = 24;
+            }
 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey!));
             var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -44,7 +50,7 @@ namespace Repositories.Repositories
                 issuer: issuer,
                 audience: audience,
                 claims: claims,
-                expires: DateTime.UtcNow.AddMinutes(15),
+                expires: DateTime.UtcNow.AddHours(expiryInHours),
                 signingCredentials: credentials
             );
 
