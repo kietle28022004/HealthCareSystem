@@ -479,8 +479,13 @@ function scheduleAppointment(patientId) {
 }
 
 function sendMessage(patientId) {
-    console.log("Sending message stub to patient:", patientId);
-    showNotification(`Opening chat for Patient ID: ${patientId}.`, "info");
+    if (!patientId || Number(patientId) <= 0) {
+        showNotification("Invalid patient id.", "danger");
+        return;
+    }
+
+    const url = `/Doctor/Messages?patientUserId=${encodeURIComponent(patientId)}`;
+    window.location.href = url;
 }
 
 function viewMedicalHistory(patientId) {

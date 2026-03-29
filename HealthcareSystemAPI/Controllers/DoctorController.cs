@@ -121,5 +121,53 @@ namespace HealthcareSystemAPI.Controllers
                 return NotFound("Doctor not found.");
             return Ok(patientList);
         }
+
+        // POST: api/doctor/avatar
+        [HttpPost("avatar")]
+        [Consumes("multipart/form-data")]
+        [ApiExplorerSettings(IgnoreApi = true)]
+        public async Task<IActionResult> UploadAvatar([FromForm] int userId, [FromForm] IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+            {
+                return BadRequest("Please select an image file.");
+            }
+
+            var currentUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(currentUserId) || int.Parse(currentUserId) != userId)
+            {
+                return Unauthorized("You can only update your own avatar.");
+            }
+
+            var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+            var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            if (!allowedExtensions.Contains(extension) || !file.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest("Unsupported image format. Use jpg, jpeg, png, gif, or webp.");
+            }
+
+            const long maxFileSize = 5 * 1024 * 1024;
+            if (file.Length > maxFileSize)
+            {
+                return BadRequest("Image size must be less than 5MB.");
+            }
+
+            try
+            {
+                await using var stream = file.OpenReadStream();
+                var avatarUrl = await _doctorService.UploadAvatarAsync(userId, stream, file.FileName);
+                if (string.IsNullOrWhiteSpace(avatarUrl))
+                {
+                    return NotFound("Doctor not found.");
+                }
+
+                return Ok(new { message = "Avatar uploaded successfully", avatarUrl });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error uploading avatar for user {userId}: {ex}");
+                return StatusCode(500, "Internal Server Error");
+            }
+        }
     }
 }

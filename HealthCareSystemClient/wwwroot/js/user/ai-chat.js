@@ -20,14 +20,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 });
 
-// Hàm lấy Token từ Session Storage
+// Token is passed from Razor view via window.AppConfig
 function getAccessToken() {
-    // Lưu ý: Bạn cần đảm bảo đã lưu AccessToken vào Session Storage
-    // nếu bạn muốn sử dụng nó ở đây. LoginController của bạn lưu vào HttpContext.Session,
-    // bạn cần chuyển nó vào Session Storage (hoặc Local Storage) trong quá trình login.
-    // Nếu không, bạn cần tạo Endpoint mới để lấy Token từ HttpContext.Session.
-    // TẠM THỜI GIẢ ĐỊNH BẠN ĐÃ LƯU TOKEN VÀO sessionStorage.
-    return sessionStorage.getItem("AccessToken");
+    return window.AppConfig && window.AppConfig.userToken ? window.AppConfig.userToken : '';
 }
 
 // Gửi tin nhắn lên API

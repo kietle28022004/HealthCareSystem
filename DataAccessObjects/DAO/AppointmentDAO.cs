@@ -156,10 +156,47 @@ namespace DataAccessObjects.DAO
         }
 
 
-        public  async Task<IEnumerable<TimeOff>> GetTimeOffByDoctoridAsync(int doctorid)
+        public async Task<IEnumerable<TimeOff>> GetTimeOffByDoctoridAsync(int doctorid)
         {
-            var restult = await _context.TimeOffs.Where(t => t.DoctorUserId == doctorid).ToListAsync();
-            return restult;
+            var result = await _context.TimeOffs
+                .Where(t => t.DoctorUserId == doctorid)
+                .OrderByDescending(t => t.StartDate)
+                .ToListAsync();
+            return result;
+        }
+
+        public async Task<TimeOff> CreateTimeOffAsync(TimeOff timeOff)
+        {
+            await _context.TimeOffs.AddAsync(timeOff);
+            await _context.SaveChangesAsync();
+            return timeOff;
+        }
+
+        public async Task<TimeOff?> UpdateTimeOffAsync(int timeOffId, TimeOff timeOff)
+        {
+            var existing = await _context.TimeOffs.FirstOrDefaultAsync(t => t.TimeOffId == timeOffId && t.DoctorUserId == timeOff.DoctorUserId);
+            if (existing == null) return null;
+
+            existing.Type = timeOff.Type;
+            existing.Title = timeOff.Title;
+            existing.StartDate = timeOff.StartDate;
+            existing.EndDate = timeOff.EndDate;
+            existing.IsAllDay = timeOff.IsAllDay;
+            existing.Reason = timeOff.Reason;
+            existing.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            return existing;
+        }
+
+        public async Task<bool> DeleteTimeOffAsync(int timeOffId, int doctorId)
+        {
+            var existing = await _context.TimeOffs.FirstOrDefaultAsync(t => t.TimeOffId == timeOffId && t.DoctorUserId == doctorId);
+            if (existing == null) return false;
+
+            _context.TimeOffs.Remove(existing);
+            await _context.SaveChangesAsync();
+            return true;
         }
     }
 }

@@ -7,7 +7,7 @@
     var apiBaseUrl = "https://localhost:7293";
 }
 <script>
-    const API_BASE_URL = "@apiBaseUrl";
+    const API_BASE_URL = '@Html.Raw(apiBaseUrl)';
 </script>
 <!-- Main Content -->
 <div class="main-content">

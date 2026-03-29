@@ -41,6 +41,9 @@ namespace Services.Interface
         Task<bool?> RequestCompleted(RejectRequest dto);
 
         Task<IEnumerable<TimeOff>> GetTimeOffByDoctoridAsync(int doctorid);
+        Task<TimeOff> CreateTimeOffAsync(TimeOff timeOff);
+        Task<TimeOff?> UpdateTimeOffAsync(int timeOffId, TimeOff timeOff);
+        Task<bool> DeleteTimeOffAsync(int timeOffId, int doctorId);
         Task<List<AppointmentResponse>> GetAppointmentsByWeekAsync(int doctorId, DateTime weekStart);
     }
 }

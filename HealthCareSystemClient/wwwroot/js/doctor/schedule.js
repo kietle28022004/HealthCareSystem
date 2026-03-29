@@ -1,372 +1,165 @@
-﻿// Doctor Schedule JavaScript
-const currentWeek = new Date()
-let bootstrap // Declare the bootstrap variable
+// Doctor Schedule JavaScript (API-driven)
 
-document.addEventListener("DOMContentLoaded", () => {
-    initializeSchedule()
-    loadScheduleGrid()
-    loadWorkingHours()
-    loadTimeOff()
-    setupEventListeners()
-})
-
-function initializeSchedule() {
-    const doctorName = localStorage.getItem("doctorName") || "Dr. Sarah Johnson"
-    document.getElementById("doctorName").textContent = doctorName
-
-    updateCurrentWeek()
+function getDoctorId() {
+    const raw = document.body.getAttribute('data-doctor-id') || '0';
+    return Number.parseInt(raw, 10) || 0;
 }
 
-function updateCurrentWeek() {
-    const startOfWeek = getStartOfWeek(currentWeek)
-    const endOfWeek = new Date(startOfWeek)
-    endOfWeek.setDate(startOfWeek.getDate() + 6)
-
-    const options = { month: "short", day: "numeric" }
-    const weekRange = `${startOfWeek.toLocaleDateString("en-US", options)} - ${endOfWeek.toLocaleDateString("en-US", options)}, ${currentWeek.getFullYear()}`
-    document.getElementById("currentWeek").textContent = weekRange
+function getCurrentWeekDateFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const week = params.get('week');
+    if (!week) return new Date();
+    const parsed = new Date(week);
+    return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
 }
 
 function getStartOfWeek(date) {
-    const d = new Date(date)
-    const day = d.getDay()
-    const diff = d.getDate() - day
-    return new Date(d.setDate(diff))
+    const d = new Date(date);
+    const day = d.getDay();
+    d.setDate(d.getDate() - day);
+    d.setHours(0, 0, 0, 0);
+    return d;
 }
 
-function loadScheduleGrid() {
-    const container = document.getElementById("scheduleGrid")
-    if (!container) return
-
-    const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
-    const timeSlots = [
-        "09:00",
-        "09:30",
-        "10:00",
-        "10:30",
-        "11:00",
-        "11:30",
-        "14:00",
-        "14:30",
-        "15:00",
-        "15:30",
-        "16:00",
-        "16:30",
-    ]
-
-    // Sample schedule data
-    const scheduleData = {
-        Monday: [
-            { time: "09:00", patient: "John Doe", type: "Consultation" },
-            { time: "10:30", patient: "Jane Smith", type: "Follow-up" },
-            { time: "14:00", patient: "Mike Johnson", type: "Check-up" },
-        ],
-        Tuesday: [
-            { time: "09:30", patient: "Sarah Wilson", type: "Consultation" },
-            { time: "15:00", patient: "David Brown", type: "Follow-up" },
-        ],
-        Wednesday: [
-            { time: "10:00", patient: "Lisa Anderson", type: "Consultation" },
-            { time: "11:00", patient: "Robert Taylor", type: "Check-up" },
-        ],
-        Thursday: [
-            { time: "09:00", patient: "Emily Davis", type: "Follow-up" },
-            { time: "14:30", patient: "Mark Wilson", type: "Consultation" },
-        ],
-        Friday: [{ time: "09:30", patient: "Anna Johnson", type: "Check-up" }],
-    }
-
-    let gridHTML = ""
-
-    // Create header row
-    gridHTML += '<div class="schedule-grid-header">'
-    gridHTML += '<div class="schedule-time-header">Time</div>'
-    days.forEach((day) => {
-        gridHTML += `<div class="schedule-day-header">${day}</div>`
-    })
-    gridHTML += "</div>"
-
-    // Create time slot rows
-    timeSlots.forEach((time) => {
-        gridHTML += '<div class="schedule-grid-row">'
-        gridHTML += `<div class="schedule-time-slot">${formatTime(time)}</div>`
-
-        days.forEach((day) => {
-            const appointment = scheduleData[day]?.find((apt) => apt.time === time)
-            let cellContent = ""
-            let cellClass = "schedule-cell"
-
-            if (appointment) {
-                cellClass += " has-appointment"
-                cellContent = `
-                    <div class="appointment-block">
-                        <div class="appointment-patient">${appointment.patient}</div>
-                        <div class="appointment-type">${appointment.type}</div>
-                    </div>
-                `
-            } else {
-                cellClass += " available"
-                cellContent =
-                    '<div class="available-slot" onclick="addAppointmentToSlot(\'' + day + "', '" + time + "')\">Available</div>"
-            }
-
-            gridHTML += `<div class="${cellClass}">${cellContent}</div>`
-        })
-
-        gridHTML += "</div>"
-    })
-
-    container.innerHTML = gridHTML
+function navigateWeek(offsetDays) {
+    const current = getCurrentWeekDateFromUrl();
+    current.setDate(current.getDate() + offsetDays);
+    const yyyy = current.getFullYear();
+    const mm = String(current.getMonth() + 1).padStart(2, '0');
+    const dd = String(current.getDate()).padStart(2, '0');
+    window.location.href = `/Doctor/Schedule?week=${yyyy}-${mm}-${dd}`;
 }
 
-function loadWorkingHours() {
-    const container = document.getElementById("workingHoursGrid")
-    if (!container) return
-
-    const workingHours = [
-        { day: "Monday", hours: "9:00 AM - 5:00 PM", isWorking: true },
-        { day: "Tuesday", hours: "9:00 AM - 5:00 PM", isWorking: true },
-        { day: "Wednesday", hours: "9:00 AM - 5:00 PM", isWorking: true },
-        { day: "Thursday", hours: "9:00 AM - 5:00 PM", isWorking: true },
-        { day: "Friday", hours: "9:00 AM - 3:00 PM", isWorking: true },
-        { day: "Saturday", hours: "Closed", isWorking: false },
-        { day: "Sunday", hours: "Closed", isWorking: false },
-    ]
-
-    container.innerHTML = workingHours
-        .map(
-            (day) => `
-        <div class="working-hours-day ${!day.isWorking ? "closed" : ""}">
-            <h6>${day.day}</h6>
-            <p>${day.hours}</p>
-        </div>
-    `,
-        )
-        .join("")
-}
-
-function loadTimeOff() {
-    const container = document.getElementById("timeOffList")
-    if (!container) return
-
-    const timeOffData = [
-        {
-            id: 1,
-            type: "vacation",
-            title: "Summer Vacation",
-            startDate: "2024-07-15",
-            endDate: "2024-07-22",
-            reason: "Family vacation to Europe",
-        },
-        {
-            id: 2,
-            type: "conference",
-            title: "Medical Conference",
-            startDate: "2024-03-10",
-            endDate: "2024-03-12",
-            reason: "Cardiology Annual Conference",
-        },
-        {
-            id: 3,
-            type: "holiday",
-            title: "Christmas Holiday",
-            startDate: "2024-12-24",
-            endDate: "2024-12-26",
-            reason: "Christmas holiday break",
-        },
-    ]
-
-    container.innerHTML = timeOffData
-        .map(
-            (timeOff) => `
-        <div class="time-off-item">
-            <div class="time-off-info">
-                <div class="time-off-icon ${timeOff.type}">
-                    <i class="fas fa-${getTimeOffIcon(timeOff.type)}"></i>
-                </div>
-                <div class="time-off-details">
-                    <h6>${timeOff.title}</h6>
-                    <p>${formatDateRange(timeOff.startDate, timeOff.endDate)}</p>
-                    <small>${timeOff.reason}</small>
-                </div>
-            </div>
-            <div class="time-off-actions">
-                <button class="btn btn-sm btn-outline-secondary" onclick="editTimeOff(${timeOff.id})">
-                    <i class="fas fa-edit"></i>
-                </button>
-                <button class="btn btn-sm btn-outline-danger" onclick="deleteTimeOff(${timeOff.id})">
-                    <i class="fas fa-trash"></i>
-                </button>
-            </div>
-        </div>
-    `,
-        )
-        .join("")
-}
-
-function setupEventListeners() {
-    // Duration radio buttons
-    const durationInputs = document.querySelectorAll('input[name="duration"]')
-    durationInputs.forEach((input) => {
-        input.addEventListener("change", function () {
-            console.log("Appointment duration changed to:", this.value, "minutes")
-        })
-    })
-
-    // Settings toggles
-    const toggles = document.querySelectorAll('input[type="checkbox"]')
-    toggles.forEach((toggle) => {
-        toggle.addEventListener("change", function () {
-            console.log(`${this.id} toggled:`, this.checked)
-        })
-    })
-}
-
-// Utility functions
-function formatTime(time24) {
-    const [hours, minutes] = time24.split(":")
-    const hour = Number.parseInt(hours)
-    const ampm = hour >= 12 ? "PM" : "AM"
-    const hour12 = hour % 12 || 12
-    return `${hour12}:${minutes} ${ampm}`
-}
-
-function formatDateRange(startDate, endDate) {
-    const start = new Date(startDate)
-    const end = new Date(endDate)
-    const options = { month: "short", day: "numeric" }
-
-    if (start.getFullYear() === end.getFullYear()) {
-        return `${start.toLocaleDateString("en-US", options)} - ${end.toLocaleDateString("en-US", options)}, ${start.getFullYear()}`
-    } else {
-        return `${start.toLocaleDateString("en-US", { ...options, year: "numeric" })} - ${end.toLocaleDateString("en-US", { ...options, year: "numeric" })}`
-    }
-}
-
-function getTimeOffIcon(type) {
-    const icons = {
-        vacation: "plane",
-        sick: "thermometer-half",
-        conference: "graduation-cap",
-        personal: "user",
-        holiday: "gift",
-    }
-    return icons[type] || "calendar-times"
-}
-
-// Navigation functions
 function previousWeek() {
-    currentWeek.setDate(currentWeek.getDate() - 7)
-    updateCurrentWeek()
-    loadScheduleGrid()
+    navigateWeek(-7);
 }
 
 function nextWeek() {
-    currentWeek.setDate(currentWeek.getDate() + 7)
-    updateCurrentWeek()
-    loadScheduleGrid()
-}
-
-// Modal functions
-function addTimeSlot() {
-    const modal = new bootstrap.Modal(document.getElementById("addTimeSlotModal"))
-    modal.show()
-}
-
-function saveTimeSlot() {
-    const form = document.getElementById("addTimeSlotForm")
-    const formData = new FormData(form)
-
-    console.log("Adding time slot:", Object.fromEntries(formData))
-
-    bootstrap.Modal.getInstance(document.getElementById("addTimeSlotModal")).hide()
-    showNotification("Time slot added successfully!", "success")
-
-    // Reload schedule
-    loadScheduleGrid()
+    navigateWeek(7);
 }
 
 function addTimeOff() {
-    const modal = new bootstrap.Modal(document.getElementById("addTimeOffModal"))
-    modal.show()
+    document.getElementById('timeOffId').value = '0';
+    document.getElementById('timeOffType').value = 'vacation';
+    document.getElementById('timeOffTitle').value = '';
+    document.getElementById('startDate').value = '';
+    document.getElementById('endDate').value = '';
+    document.getElementById('allDay').checked = true;
+    document.getElementById('timeOffReason').value = '';
+
+    const saveBtn = document.getElementById('saveTimeOffBtn');
+    if (saveBtn) saveBtn.textContent = 'Add Time Off';
+
+    const modal = new bootstrap.Modal(document.getElementById('addTimeOffModal'));
+    modal.show();
 }
 
-function saveTimeOff() {
-    const form = document.getElementById("addTimeOffForm")
-    const formData = new FormData(form)
-
-    console.log("Adding time off:", Object.fromEntries(formData))
-
-    bootstrap.Modal.getInstance(document.getElementById("addTimeOffModal")).hide()
-    showNotification("Time off added successfully!", "success")
-
-    // Reload time off list
-    loadTimeOff()
+function closeTimeOffModal() {
+    const modalEl = document.getElementById('addTimeOffModal');
+    const modal = bootstrap.Modal.getInstance(modalEl);
+    if (modal) modal.hide();
 }
 
-function editWorkingHours() {
-    console.log("Editing working hours")
-    showNotification("Working hours editing coming soon", "info")
-}
-
-function saveAvailabilitySettings() {
-    const duration = document.querySelector('input[name="duration"]:checked')?.value
-    const bufferTime = document.getElementById("bufferTime")?.value
-    const advanceBooking = document.getElementById("advanceBooking")?.value
-    const autoAccept = document.getElementById("autoAccept")?.checked
-    const allowRescheduling = document.getElementById("allowRescheduling")?.checked
-
-    const settings = {
-        duration,
-        bufferTime,
-        advanceBooking,
-        autoAccept,
-        allowRescheduling,
+async function saveTimeOff() {
+    const doctorId = getDoctorId();
+    if (!doctorId) {
+        alert('Cannot determine doctor ID. Please login again.');
+        return;
     }
 
-    console.log("Saving availability settings:", settings)
-    localStorage.setItem("doctorAvailabilitySettings", JSON.stringify(settings))
-    showNotification("Settings saved successfully!", "success")
-}
+    const timeOffId = Number.parseInt(document.getElementById('timeOffId')?.value || '0', 10);
+    const type = document.getElementById('timeOffType')?.value;
+    const title = document.getElementById('timeOffTitle')?.value?.trim();
+    const startDate = document.getElementById('startDate')?.value;
+    const endDate = document.getElementById('endDate')?.value;
+    const isAllDay = document.getElementById('allDay')?.checked ?? true;
+    const reason = document.getElementById('timeOffReason')?.value?.trim();
 
-// Action functions
-function addAppointmentToSlot(day, time) {
-    console.log("Adding appointment to:", day, time)
-    // Open appointment modal with pre-filled day and time
-    addTimeSlot()
-}
+    if (!title || !startDate || !endDate) {
+        alert('Please fill title, start date, and end date.');
+        return;
+    }
 
-function editTimeOff(timeOffId) {
-    console.log("Editing time off:", timeOffId)
-    // Open edit modal with pre-filled data
-}
+    const payload = {
+        doctorUserId: doctorId,
+        type: type || 'personal',
+        title,
+        startDate,
+        endDate,
+        isAllDay,
+        reason: reason || ''
+    };
 
-function deleteTimeOff(timeOffId) {
-    if (confirm("Are you sure you want to delete this time off?")) {
-        console.log("Deleting time off:", timeOffId)
-        showNotification("Time off deleted successfully!", "success")
-        loadTimeOff()
+    try {
+        const isEdit = timeOffId > 0;
+        const url = isEdit
+            ? `https://localhost:7293/api/Appointment/TimeOff/${timeOffId}`
+            : 'https://localhost:7293/api/Appointment/TimeOff';
+
+        const res = await fetch(url, {
+            method: isEdit ? 'PUT' : 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+            const err = await res.text();
+            throw new Error(err || `Failed to ${isEdit ? 'update' : 'create'} time off`);
+        }
+
+        closeTimeOffModal();
+        window.location.reload();
+    } catch (error) {
+        console.error('saveTimeOff error:', error);
+        alert('Failed to save time off: ' + error.message);
     }
 }
 
-function showNotification(message, type = "info") {
-    const notification = document.createElement("div")
-    notification.className = `alert alert-${type} alert-dismissible fade show position-fixed`
-    notification.style.cssText = "top: 20px; right: 20px; z-index: 9999;"
-    notification.innerHTML = `
-        ${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    `
-    document.body.appendChild(notification)
+async function deleteTimeOff(timeOffId) {
+    const doctorId = getDoctorId();
+    if (!doctorId) {
+        alert('Cannot determine doctor ID. Please login again.');
+        return;
+    }
 
-    setTimeout(() => {
-        notification.remove()
-    }, 3000)
+    if (!confirm('Are you sure you want to delete this time off?')) return;
+
+    try {
+        const res = await fetch(`https://localhost:7293/api/Appointment/TimeOff/${timeOffId}?doctorId=${doctorId}`, {
+            method: 'DELETE'
+        });
+
+        if (!res.ok && res.status !== 204) {
+            const err = await res.text();
+            throw new Error(err || 'Failed to delete time off');
+        }
+
+        window.location.reload();
+    } catch (error) {
+        console.error('deleteTimeOff error:', error);
+        alert('Failed to delete time off: ' + error.message);
+    }
 }
 
-function logout() {
-    if (confirm("Are you sure you want to logout?")) {
-        localStorage.clear()
-        window.location.href = "login.html"
-    }
+function editTimeOffFromButton(btn) {
+    const timeOffId = btn.getAttribute('data-timeoff-id') || '0';
+    const type = btn.getAttribute('data-type') || 'personal';
+    const title = btn.getAttribute('data-title') || '';
+    const startDate = btn.getAttribute('data-start-date') || '';
+    const endDate = btn.getAttribute('data-end-date') || '';
+    const reason = btn.getAttribute('data-reason') || '';
+
+    document.getElementById('timeOffId').value = timeOffId;
+    document.getElementById('timeOffType').value = type;
+    document.getElementById('timeOffTitle').value = title;
+    document.getElementById('startDate').value = startDate;
+    document.getElementById('endDate').value = endDate;
+    document.getElementById('allDay').checked = true;
+    document.getElementById('timeOffReason').value = reason;
+
+    const saveBtn = document.getElementById('saveTimeOffBtn');
+    if (saveBtn) saveBtn.textContent = 'Update Time Off';
+
+    const modal = new bootstrap.Modal(document.getElementById('addTimeOffModal'));
+    modal.show();
 }

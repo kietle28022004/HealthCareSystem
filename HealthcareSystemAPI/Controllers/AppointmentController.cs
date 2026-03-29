@@ -1,5 +1,6 @@
 using BusinessObjects.DataTransferObjects.AppointmentDTOs;
 using BusinessObjects.DataTransferObjects.PaymentDTOs;
+using BusinessObjects.Domain;
 using Microsoft.AspNetCore.Mvc;
 using Services.Interface;
 using System.Linq;
@@ -31,8 +32,85 @@ namespace HealthcareSystemAPI.Controllers
         [HttpGet("TimeOff/{id}")]
         public async Task<IActionResult> GetTimeOffAll(int id)
         {
-            var appointments = await _appointmentService.GetTimeOffByDoctoridAsync(id);
-            return Ok(appointments);
+            var timeOffs = await _appointmentService.GetTimeOffByDoctoridAsync(id);
+            return Ok(timeOffs);
+        }
+
+        public class CreateTimeOffRequest
+        {
+            public int DoctorUserId { get; set; }
+            public string Type { get; set; } = "personal";
+            public string Title { get; set; } = string.Empty;
+            public DateOnly StartDate { get; set; }
+            public DateOnly EndDate { get; set; }
+            public bool IsAllDay { get; set; } = true;
+            public string? Reason { get; set; }
+        }
+
+        [HttpPost("TimeOff")]
+        public async Task<IActionResult> CreateTimeOff([FromBody] CreateTimeOffRequest request)
+        {
+            if (request.DoctorUserId <= 0 || string.IsNullOrWhiteSpace(request.Title))
+            {
+                return BadRequest(new { message = "Invalid time off data" });
+            }
+
+            var created = await _appointmentService.CreateTimeOffAsync(new TimeOff
+            {
+                DoctorUserId = request.DoctorUserId,
+                Type = request.Type,
+                Title = request.Title,
+                StartDate = request.StartDate,
+                EndDate = request.EndDate,
+                IsAllDay = request.IsAllDay,
+                Reason = request.Reason
+            });
+
+            return Ok(created);
+        }
+
+        [HttpPut("TimeOff/{timeOffId}")]
+        public async Task<IActionResult> UpdateTimeOff(int timeOffId, [FromBody] CreateTimeOffRequest request)
+        {
+            if (timeOffId <= 0 || request.DoctorUserId <= 0 || string.IsNullOrWhiteSpace(request.Title))
+            {
+                return BadRequest(new { message = "Invalid time off data" });
+            }
+
+            var updated = await _appointmentService.UpdateTimeOffAsync(timeOffId, new TimeOff
+            {
+                DoctorUserId = request.DoctorUserId,
+                Type = request.Type,
+                Title = request.Title,
+                StartDate = request.StartDate,
+                EndDate = request.EndDate,
+                IsAllDay = request.IsAllDay,
+                Reason = request.Reason
+            });
+
+            if (updated == null)
+            {
+                return NotFound(new { message = "TimeOff not found" });
+            }
+
+            return Ok(updated);
+        }
+
+        [HttpDelete("TimeOff/{timeOffId}")]
+        public async Task<IActionResult> DeleteTimeOff(int timeOffId, [FromQuery] int doctorId)
+        {
+            if (timeOffId <= 0 || doctorId <= 0)
+            {
+                return BadRequest(new { message = "Invalid request" });
+            }
+
+            var deleted = await _appointmentService.DeleteTimeOffAsync(timeOffId, doctorId);
+            if (!deleted)
+            {
+                return NotFound(new { message = "TimeOff not found" });
+            }
+
+            return NoContent();
         }
 
 
@@ -75,6 +153,11 @@ namespace HealthcareSystemAPI.Controllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
+            if (request.AppointmentDateTime <= DateTime.Now)
+            {
+                return BadRequest(new { message = "Appointment time must be in the future." });
+            }
+
             var created = await _appointmentService.CreateAsync(request);
             return CreatedAtAction(nameof(GetById), new { id = created.AppointmentId }, created);
         }
@@ -85,6 +168,11 @@ namespace HealthcareSystemAPI.Controllers
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
+
+            if (request.AppointmentDateTime <= DateTime.Now)
+            {
+                return BadRequest(new { message = "Appointment time must be in the future." });
+            }
 
 
             var updated = await _appointmentService.UpdateAsync(request, id);
@@ -161,12 +249,22 @@ namespace HealthcareSystemAPI.Controllers
         [HttpPost("timeslot3")]
         public async Task<IActionResult> IsTimeSlotBook3([FromBody] IsTimeSlotBook3Request dto)
         {
+            if (dto.AppointmentDate <= DateTime.Now)
+            {
+                return Ok(true);
+            }
+
             var result = await _appointmentService.IsTimeSlotBookedAsync(dto.DoctorId, dto.AppointmentDate, dto.excludeAppointmentId);
             return Ok(result);
         }
         [HttpPost("timeslot2")]
         public async Task<IActionResult> IsTimeSlotBook2([FromBody] IsTimeSlotBook2Request dto)
         {
+            if (dto.AppointmentDate <= DateTime.Now)
+            {
+                return Ok(true);
+            }
+
             var result = await _appointmentService.IsTimeSlotBookedAsync(dto.DoctorId, dto.AppointmentDate);
             return Ok(result);
         }

@@ -21,6 +21,11 @@ namespace HealthCareSystemClient.Controllers
         private int? currentUser => HttpContext.Session.GetInt32("UserId");
         public IActionResult Index()
         {
+            if (currentUser == null)
+            {
+                return RedirectToAction("Index", "Login");
+            }
+
             ViewData["ActiveMenu"] = "Dashboard";
             return View();
         }
@@ -261,6 +266,11 @@ namespace HealthCareSystemClient.Controllers
 
         public IActionResult Patients()
         {
+            if (currentUser == null)
+            {
+                return RedirectToAction("Index", "Login");
+            }
+
             ViewData["ActiveMenu"] = "Patients";
             var currentUserId = HttpContext.Session.GetInt32("UserId");
             var fullName = HttpContext.Session.GetString("FullName");
@@ -316,6 +326,10 @@ namespace HealthCareSystemClient.Controllers
             var apointmentResponse = await client.PostAsJsonAsync("api/Appointment/week" , dto);
             var weekAppointments = await apointmentResponse.Content.ReadFromJsonAsync<List<AppointmentResponse>>();
 
+            // Get time off list first so weekly slot availability can reflect day-off ranges.
+            var responsetime = await client.GetAsync($"api/Appointment/TimeOff/{doctorId}");
+            var timeOffs = await responsetime.Content.ReadFromJsonAsync<List<TimeOff>>() ?? new List<TimeOff>();
+
             // Build weekly schedule
             var weeklySchedule = new List<WeeklyScheduleDay>();
             for (int i = 0; i < 7; i++)
@@ -331,17 +345,11 @@ namespace HealthCareSystemClient.Controllers
                     Date = currentDate,
                     IsToday = currentDate.Date == DateTime.Today,
                     Appointments = MapToScheduleAppointments(dayAppointments),
-                    AvailableSlots = GenerateAvailableSlots(currentDate, dayAppointments)
+                    AvailableSlots = GenerateAvailableSlots(currentDate, dayAppointments, timeOffs)
                 };
 
                 weeklySchedule.Add(daySchedule);
             }
-
-            // Get time off list from database
-            //var timeOffs = await _timeOffService.GetTimeOffsByDoctorAsync(doctorId);
-
-            var responsetime = await client.GetAsync($"api/Appointment/TimeOff/{doctorId}");
-            var timeOffs = await responsetime.Content.ReadFromJsonAsync<List<TimeOff>>();
 
             var timeOffList = timeOffs.Select(t => new TimeOffItem
             {
@@ -419,12 +427,16 @@ namespace HealthCareSystemClient.Controllers
             };
         }
 
-        private List<TimeSlot> GenerateAvailableSlots(DateTime date, List<AppointmentResponse> appointments)
+        private List<TimeSlot> GenerateAvailableSlots(DateTime date, List<AppointmentResponse> appointments, List<TimeOff> timeOffs)
         {
             var slots = new List<TimeSlot>();
             var startTime = new TimeSpan(9, 0, 0); // 9:00 AM
             var endTime = new TimeSpan(17, 00, 0); // 5:00 PM
             var slotDuration = new TimeSpan(0, 30, 0); // 30 minutes
+
+            var isTimeOffDate = timeOffs.Any(t =>
+                date.Date >= t.StartDate.ToDateTime(TimeOnly.MinValue).Date &&
+                date.Date <= t.EndDate.ToDateTime(TimeOnly.MinValue).Date);
 
             for (var time = startTime; time < endTime; time += slotDuration)
             {
@@ -432,6 +444,11 @@ namespace HealthCareSystemClient.Controllers
                 var isAvailable = !appointments.Any(a =>
                     a.AppointmentDateTime.TimeOfDay >= time &&
                     a.AppointmentDateTime.TimeOfDay < slotEndTime);
+
+                if (isTimeOffDate)
+                {
+                    isAvailable = false;
+                }
 
                 slots.Add(new TimeSlot
                 {
@@ -455,14 +472,24 @@ namespace HealthCareSystemClient.Controllers
 
         public IActionResult Profile()
         {
+            if (currentUser == null)
+            {
+                return RedirectToAction("Index", "Login");
+            }
+
             ViewData["ActiveMenu"] = "Profile";
             return View();
         }
         public async Task<IActionResult> Calendar(int? year, int? month)
         {
+            if (currentUser == null)
+            {
+                return RedirectToAction("Index", "Login");
+            }
+
             ViewData["ActiveMenu"] = "Calendar";
 
-            var doctorId = HttpContext.Session.GetInt32("UserId") ?? 1;
+            var doctorId = currentUser.Value;
             var currentDate = year.HasValue && month.HasValue
                 ? new DateTime(year.Value, month.Value, 1)
                 : new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
@@ -574,6 +601,11 @@ namespace HealthCareSystemClient.Controllers
         }
         public IActionResult Messages()
         {
+            if (currentUser == null)
+            {
+                return RedirectToAction("Index", "Login");
+            }
+
             ViewData["ActiveMenu"] = "Messages";
             ViewBag.ApiBaseUrl = "https://localhost:7293";
             return View();

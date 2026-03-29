@@ -12,6 +12,7 @@ let currentConversation = null;
 let conversations = [];
 let connection = null;
 let isUploading = false;
+const preselectPatientUserId = Number(new URLSearchParams(window.location.search).get('patientUserId') || 0);
 
 // Video Variables
 let activeRoom = null;
@@ -25,8 +26,45 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     await loadConversations();
     await initializeSignalR();
+        await loadPatientOptions();
     setupEventListeners();
+
+    if (preselectPatientUserId > 0) {
+        await openConversationWithPatient(preselectPatientUserId);
+    }
 });
+
+    async function loadPatientOptions() {
+        const select = document.getElementById('newConversationPatientSelect');
+        if (!select) {
+            return;
+        }
+
+        try {
+            const res = await fetch(`${CONFIG.apiBaseUrl}/api/doctor/get-patient/${CONFIG.userId}`, {
+                headers: { 'Authorization': `Bearer ${CONFIG.userToken}` }
+            });
+
+            if (!res.ok) {
+                throw new Error(`Failed to load patients: ${res.status}`);
+            }
+
+            const patients = await res.json();
+            if (!Array.isArray(patients) || patients.length === 0) {
+                select.innerHTML = '<option value="">No patient found</option>';
+                return;
+            }
+
+            select.innerHTML = '<option value="">Select a patient</option>' + patients.map((p) => {
+                const id = p.userId || p.id;
+                const name = p.fullName || p.name || `User ${id}`;
+                return `<option value="${id}">${name} (ID: ${id})</option>`;
+            }).join('');
+        } catch (error) {
+            console.error('Failed to load patient options:', error);
+            select.innerHTML = '<option value="">Failed to load patients</option>';
+        }
+    }
 
 // ================= SIGNALR =================
 async function initializeSignalR() {
@@ -78,7 +116,7 @@ function renderConversations() {
     }
 
     container.innerHTML = conversations.map(c => `
-        <div class="conversation-item" onclick="selectConversation(${c.conversationId})">
+        <div class="conversation-item" data-conversation-id="${c.conversationId}" onclick="selectConversation(${c.conversationId}, this)">
             <div class="conversation-avatar">
                 <img src="${c.otherUserAvatar || '/placeholder.svg?height=32&width=32'}" alt="Avatar">
             </div>
@@ -91,9 +129,14 @@ function renderConversations() {
     `).join('');
 }
 
-async function selectConversation(conversationId) {
+async function selectConversation(conversationId, clickedElement = null) {
     document.querySelectorAll('.conversation-item').forEach(i => i.classList.remove('active'));
-    event.currentTarget.classList.add('active');
+    if (clickedElement) {
+        clickedElement.classList.add('active');
+    } else {
+        const selected = document.querySelector(`.conversation-item[data-conversation-id="${conversationId}"]`);
+        if (selected) selected.classList.add('active');
+    }
 
     currentConversation = conversations.find(c => c.conversationId === conversationId);
     if (!currentConversation) return;
@@ -111,6 +154,43 @@ async function selectConversation(conversationId) {
 
     currentConversation.unreadCount = 0;
     renderConversations();
+}
+
+async function openConversationWithPatient(patientUserId) {
+    try {
+        const res = await fetch(`${CONFIG.apiBaseUrl}/api/conversation/create-or-get`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${CONFIG.userToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                patientUserId: Number(patientUserId),
+                doctorUserId: Number(CONFIG.userId)
+            })
+        });
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(errorText || `Create/Get conversation failed with status ${res.status}`);
+        }
+
+        const data = await res.json();
+        const conversationId = Number(data?.conversationId || 0);
+
+        if (conversationId <= 0) {
+            throw new Error('Invalid conversationId returned by API.');
+        }
+
+        if (!conversations.some(c => c.conversationId === conversationId)) {
+            await loadConversations();
+        }
+
+        await selectConversation(conversationId);
+    } catch (error) {
+        console.error('Failed to open conversation with patient:', error);
+        alert('Cannot open chat with this patient right now. Please try again.');
+    }
 }
 
 async function loadMessages(conversationId) {
@@ -202,8 +282,22 @@ async function fetchTwilioToken(roomName) {
         const res = await fetch(`${CONFIG.apiBaseUrl}/api/twilio/token?roomName=${encodeURIComponent(roomName)}`, {
             headers: { 'Authorization': `Bearer ${CONFIG.userToken}` }
         });
-        return await res.json();
-    } catch (e) { return null; }
+
+        const data = await res.json();
+        if (!res.ok) {
+            const detail = data?.message || data?.hint || `Twilio token API failed: ${res.status}`;
+            throw new Error(detail);
+        }
+
+        if (!data?.token) {
+            throw new Error('Twilio token response does not contain token.');
+        }
+
+        return data;
+    } catch (e) {
+        console.error('fetchTwilioToken error:', e);
+        return { error: e.message || 'Cannot fetch Twilio token' };
+    }
 }
 
 async function startVideoCall() {
@@ -224,8 +318,8 @@ async function startVideoCall() {
     document.getElementById('local-video').innerHTML = '';
 
     const tokenData = await fetchTwilioToken(roomName);
-    if (!tokenData) {
-        document.getElementById('connectionStatus').innerText = "Token Error";
+    if (!tokenData || !tokenData.token) {
+        document.getElementById('connectionStatus').innerText = tokenData?.error || "Token Error";
         return;
     }
 
@@ -384,7 +478,32 @@ function setupEventListeners() {
 }
 
 // Placeholders
-function startNewConversation() { alert('Coming soon'); }
+function startNewConversation() {
+        const modalEl = document.getElementById('newConversationModal');
+        if (!modalEl) {
+            return;
+        }
+
+        const modal = new bootstrap.Modal(modalEl);
+        modal.show();
+}
+
+    function createConversationFromSelection() {
+        const select = document.getElementById('newConversationPatientSelect');
+        const patientUserId = Number(select?.value || 0);
+        if (!patientUserId) {
+            alert('Please select a patient.');
+            return;
+        }
+
+        const modalEl = document.getElementById('newConversationModal');
+        const modal = modalEl ? bootstrap.Modal.getInstance(modalEl) : null;
+        if (modal) {
+            modal.hide();
+        }
+
+        openConversationWithPatient(patientUserId);
+    }
 function startVoiceCall() { alert('Voice call coming soon'); }
 function viewPatientProfile() { alert('Profile coming soon'); }
 function scheduleAppointment() { alert('Schedule coming soon'); }

@@ -99,15 +99,15 @@ namespace Services.Services
                 DoctorName                        = doctor.FullName,
                 PatientEmail                      = patient.Email,
                 PatientPhoneNumber                = patient.PhoneNumber,
-                PatientDateOfBirth                = appointment.PatientUser.DateOfBirth,
+                PatientDateOfBirth                = patient.DateOfBirth,
                 PatientGender                     = patient.Gender,
                 PatientAddress                    = patient.Address,
                 PatientEmergencyPhoneNumber       = patient.EmergencyPhoneNumber,
                 PatientBloodType                  = patient.BloodType,
-                PatientAllergies                  = appointment.PatientUser.Allergies,
-                PatientWeight                     = appointment.PatientUser.Weight,
-                PatientHeight                     = appointment.PatientUser.Height,
-                PatientBmi                        = appointment.PatientUser.Bmi
+                PatientAllergies                  = patient.Allergies != null ? string.Join(", ", patient.Allergies) : null,
+                PatientWeight                     = patient.Weight,
+                PatientHeight                     = patient.Height,
+                PatientBmi                        = patient.BMI
             };
 
         }
@@ -406,6 +406,24 @@ namespace Services.Services
         {
             var result = await _appointmentDAO.GetTimeOffByDoctoridAsync(doctorid);
             return result;
+        }
+
+        public async Task<TimeOff> CreateTimeOffAsync(TimeOff timeOff)
+        {
+            timeOff.CreatedAt = DateTime.UtcNow;
+            timeOff.UpdatedAt = DateTime.UtcNow;
+            return await _appointmentDAO.CreateTimeOffAsync(timeOff);
+        }
+
+        public async Task<TimeOff?> UpdateTimeOffAsync(int timeOffId, TimeOff timeOff)
+        {
+            timeOff.UpdatedAt = DateTime.UtcNow;
+            return await _appointmentDAO.UpdateTimeOffAsync(timeOffId, timeOff);
+        }
+
+        public async Task<bool> DeleteTimeOffAsync(int timeOffId, int doctorId)
+        {
+            return await _appointmentDAO.DeleteTimeOffAsync(timeOffId, doctorId);
         }
     }
 }

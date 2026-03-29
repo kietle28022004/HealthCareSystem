@@ -74,17 +74,31 @@ namespace HealthCareSystemClient.Controllers
                 if (!string.IsNullOrEmpty(id))
                 {
                     var client = _httpClientFactory.CreateClient("healthcaresystemapi");
-                    await client.GetAsync($"api/Payment/verify/{id}");
+                    var verifyResponse = await client.GetAsync($"api/Payment/verify/{id}");
+                    if (!verifyResponse.IsSuccessStatusCode)
+                    {
+                        var errorBody = await verifyResponse.Content.ReadAsStringAsync();
+                        _logger.LogError(
+                            "Return: VerifyPayment failed. PaymentLinkId={PaymentLinkId}, StatusCode={StatusCode}, Body={Body}",
+                            id, verifyResponse.StatusCode, errorBody);
+                    }
+                    else
+                    {
+                        var payment = await verifyResponse.Content.ReadFromJsonAsync<PaymentResponse>();
+                        _logger.LogInformation(
+                            "Return: Payment verified. PaymentLinkId={PaymentLinkId}, PaymentId={PaymentId}, Status={Status}",
+                            id, payment?.PaymentId, payment?.Status);
+                    }
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to verify payment link {PaymentLinkId}", id);
+                _logger.LogWarning(ex, "Return: Failed to verify payment link {PaymentLinkId}", id);
             }
 
             var isSuccess = string.Equals(code, "00", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(status, "PAID", StringComparison.OrdinalIgnoreCase)
-                || cancel == false;
+                || (cancel == false && !string.IsNullOrEmpty(orderCode));
 
             if (isSuccess)
             {
@@ -203,7 +217,11 @@ namespace HealthCareSystemClient.Controllers
             var response = await client.PostAsJsonAsync("api/Payment", paymentRequest);
             if (!response.IsSuccessStatusCode)
             {
-                TempData["Error"] = "Failed to start payment. Please try again.";
+                var errorBody = await response.Content.ReadAsStringAsync();
+                _logger.LogError(
+                    "CreatePrepayment failed. StatusCode={StatusCode}, Reason={Reason}, Body={Body}",
+                    response.StatusCode, response.ReasonPhrase, errorBody);
+                TempData["Error"] = "Failed to start payment. Please try again. Error: " + errorBody;
                 return RedirectToAction("Appointments", "User");
             }
 
@@ -230,7 +248,21 @@ namespace HealthCareSystemClient.Controllers
                 if (!string.IsNullOrEmpty(id))
                 {
                     var client = _httpClientFactory.CreateClient("healthcaresystemapi");
-                    await client.GetAsync($"api/Payment/verify/{id}");
+                    var verifyResponse = await client.GetAsync($"api/Payment/verify/{id}");
+                    if (!verifyResponse.IsSuccessStatusCode)
+                    {
+                        var errorBody = await verifyResponse.Content.ReadAsStringAsync();
+                        _logger.LogError(
+                            "VerifyPayment failed. PaymentLinkId={PaymentLinkId}, StatusCode={StatusCode}, Body={Body}",
+                            id, verifyResponse.StatusCode, errorBody);
+                    }
+                    else
+                    {
+                        var payment = await verifyResponse.Content.ReadFromJsonAsync<PaymentResponse>();
+                        _logger.LogInformation(
+                            "Payment verified. PaymentLinkId={PaymentLinkId}, PaymentId={PaymentId}, Status={Status}, HasAppointment={HasAppointment}",
+                            id, payment?.PaymentId, payment?.Status, payment?.AppointmentId);
+                    }
                 }
             }
             catch (Exception ex)
@@ -240,7 +272,7 @@ namespace HealthCareSystemClient.Controllers
 
             var isSuccess = string.Equals(code, "00", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(status, "PAID", StringComparison.OrdinalIgnoreCase)
-                || cancel == false;
+                || (cancel == false && !string.IsNullOrEmpty(orderCode));
 
             if (!isSuccess)
             {

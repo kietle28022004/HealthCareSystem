@@ -120,6 +120,14 @@ namespace HealthCareSystemClient.Controllers
         {
             ViewData["ActiveMenu"] = "Appointments";
             var currentUserId = HttpContext.Session.GetInt32("UserId");
+            if (currentUserId == null)
+            {
+                return RedirectToAction("Index", "Login");
+            }
+            if (currentUserId == null)
+            {
+                return RedirectToAction("Index", "Login");
+            }
 
             var client = _httpClientFactory.CreateClient("healthcaresystemapi");
             var userId = HttpContext.Session.GetInt32("UserId");
@@ -461,6 +469,12 @@ namespace HealthCareSystemClient.Controllers
             try
             {
                 var newAppointmentDateTime = model.AppointmentDate.Add(model.AppointmentTime);
+                if (newAppointmentDateTime <= DateTime.Now)
+                {
+                    TempData["Error"] = "Appointment time must be in the future.";
+                    return RedirectToAction("Appointments");
+                }
+
                 var dto = new
                 {
                     DoctorId = model.DoctorUserId,
@@ -471,7 +485,13 @@ namespace HealthCareSystemClient.Controllers
                 var response = await client.PostAsJsonAsync("api/Appointment/timeslot3", dto);
 
                 if (!response.IsSuccessStatusCode)
-                    return View();
+                {
+                    var apiError = await response.Content.ReadAsStringAsync();
+                    TempData["Error"] = string.IsNullOrWhiteSpace(apiError)
+                        ? "Unable to validate selected time slot. Please try again."
+                        : apiError;
+                    return RedirectToAction("Appointments");
+                }
 
                 var isBooked = await response.Content.ReadFromJsonAsync<bool>();
                 // Check if new time slot is available (excluding current appointment)
@@ -665,11 +685,23 @@ namespace HealthCareSystemClient.Controllers
 
         public IActionResult Doctors()
         {
+            var currentUserId = HttpContext.Session.GetInt32("UserId");
+            if (currentUserId == null)
+            {
+                return RedirectToAction("Index", "Login");
+            }
+
             ViewData["ActiveMenu"] = "Doctors";
             return View();
         }
         public IActionResult Messages()
         {
+            var currentUserId = HttpContext.Session.GetInt32("UserId");
+            if (currentUserId == null)
+            {
+                return RedirectToAction("Index", "Login");
+            }
+
             ViewData["ActiveMenu"] = "Messages";
             ViewBag.ApiBaseUrl = "https://localhost:7293";
             return View();
@@ -678,10 +710,15 @@ namespace HealthCareSystemClient.Controllers
         [HttpGet]
         public IActionResult ChatBox()
         {
+            var currentUserId = HttpContext.Session.GetInt32("UserId");
+            if (currentUserId == null)
+            {
+                return RedirectToAction("Index", "Login");
+            }
+
             ViewData["ActiveMenu"] = "ChatBox";
 
             // 1. Lấy thông tin từ Session
-            var currentUserId = HttpContext.Session.GetInt32("UserId");
             var fullName = HttpContext.Session.GetString("FullName");
             var avatarUrl = HttpContext.Session.GetString("AvatarUrl");
 
@@ -700,6 +737,12 @@ namespace HealthCareSystemClient.Controllers
 
         public IActionResult Profile()
         {
+            var currentUserId = HttpContext.Session.GetInt32("UserId");
+            if (currentUserId == null)
+            {
+                return RedirectToAction("Index", "Login");
+            }
+
             ViewData["ActiveMenu"] = "Profile";
             return View();
         }

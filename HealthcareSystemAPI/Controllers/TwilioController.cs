@@ -11,14 +11,30 @@ using System.Collections.Generic;
 public class TwilioController : ControllerBase
 {
     private readonly string _accountSid;
-    private readonly string _apiKey;
+    private readonly string _apiKeySid;
     private readonly string _apiSecret;
 
     public TwilioController(IConfiguration configuration)
     {
-        _accountSid = configuration["Twilio:AccountSid"]!;
-        _apiKey = configuration["Twilio:ApiKey"]!;
-        _apiSecret = configuration["Twilio:ApiSecret"]!;
+        var configuredAccountSid = configuration["Twilio:AccountSid"] ?? string.Empty;
+        var configuredApiKeySid = configuration["Twilio:ApiKeySid"]
+                     ?? configuration["Twilio:ApiKey"]
+                     ?? string.Empty;
+        var configuredApiSecret = configuration["Twilio:ApiSecret"] ?? string.Empty;
+
+        // Handle common misconfiguration where AccountSid and ApiKeySid are swapped.
+        if (configuredAccountSid.StartsWith("SK") && configuredApiKeySid.StartsWith("AC"))
+        {
+            _accountSid = configuredApiKeySid;
+            _apiKeySid = configuredAccountSid;
+        }
+        else
+        {
+            _accountSid = configuredAccountSid;
+            _apiKeySid = configuredApiKeySid;
+        }
+
+        _apiSecret = configuredApiSecret;
     }
 
     [HttpGet("token")]
@@ -27,6 +43,29 @@ public class TwilioController : ControllerBase
         if (string.IsNullOrEmpty(roomName))
         {
             return BadRequest(new { message = "Tên phòng (roomName) là bắt buộc." });
+        }
+
+        if (string.IsNullOrWhiteSpace(_accountSid) || string.IsNullOrWhiteSpace(_apiKeySid) || string.IsNullOrWhiteSpace(_apiSecret))
+        {
+            return StatusCode(500, new
+            {
+                message = "Twilio configuration is missing.",
+                required = new[]
+                {
+                    "Twilio:AccountSid (must start with AC)",
+                    "Twilio:ApiKeySid (must start with SK)",
+                    "Twilio:ApiSecret"
+                }
+            });
+        }
+
+        if (!_accountSid.StartsWith("AC") || !_apiKeySid.StartsWith("SK"))
+        {
+            return StatusCode(500, new
+            {
+                message = "Twilio configuration is invalid.",
+                hint = "AccountSid must start with AC, ApiKeySid must start with SK. Create an API Key in Twilio Console and use its SID + Secret."
+            });
         }
 
         // Lấy User ID (danh tính) từ JWT Token
@@ -43,7 +82,7 @@ public class TwilioController : ControllerBase
 
             var token = new Token(
                 _accountSid,
-                _apiKey,
+                _apiKeySid,
                 _apiSecret,
                 identity: identity,
                 grants: grants

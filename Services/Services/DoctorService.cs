@@ -14,10 +14,12 @@ namespace Services.Services
     public class DoctorService : IDoctorService
     {
         private readonly IDoctorRepository _doctorRepository;
+        private readonly ICloudinaryService _cloudinaryService;
 
-        public DoctorService(IDoctorRepository doctorRepository)
+        public DoctorService(IDoctorRepository doctorRepository, ICloudinaryService cloudinaryService)
         {
             _doctorRepository = doctorRepository;
+            _cloudinaryService = cloudinaryService;
         }
 
         public async Task<DoctorProfileDTO?> GetDoctorProfileAsync(int userId)
@@ -114,6 +116,19 @@ namespace Services.Services
         }
 
         public async Task<IEnumerable<PatientProfileDTO>> GetPatientsByDoctorId(int doctorUserId) => await _doctorRepository.GetPatientsByDoctorId(doctorUserId);
+
+        public async Task<string?> UploadAvatarAsync(int userId, Stream imageStream, string fileName)
+        {
+            var doctor = await _doctorRepository.GetDoctorByUserIdAsync(userId);
+            if (doctor == null || doctor.User == null) return null;
+
+            var avatarUrl = await _cloudinaryService.UploadImageAsync(imageStream, fileName);
+            doctor.User.AvatarUrl = avatarUrl;
+            doctor.UpdatedAt = DateTime.UtcNow;
+
+            await _doctorRepository.UpdateDoctorAsync(doctor);
+            return avatarUrl;
+        }
     }
 }
 

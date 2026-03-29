@@ -11,6 +11,7 @@ using Services.Services;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json.Serialization;
+using HealthcareSystemAPI;
 using HealthcareSystemAPI.Converters;
 using HealthcareSystemAPI.Hubs;
 using BusinessObjects.DataTransferObjects;
@@ -69,7 +70,7 @@ builder.Services.Configure<GoogleSettings>(builder.Configuration.GetSection("Goo
 
 builder.Services.AddDbContext<HealthCareSystemContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnectionString")));
-builder.Services.Configure<OpenAIOptions>(builder.Configuration.GetSection("Gemini"));
+builder.Services.Configure<OpenAIOptions>(builder.Configuration.GetSection("Groq"));
 builder.Services.Configure<CloudinarySettings>(builder.Configuration.GetSection("CloudinarySettings"));
 
 // ------------------ Repository DI ----------------------
@@ -117,6 +118,7 @@ builder.Services.AddSignalR();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        options.IncludeErrorDetails = true;
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -136,6 +138,28 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         {
             OnMessageReceived = context =>
             {
+                // 1) Standard HTTP Authorization header support with tolerant parsing.
+                if (string.IsNullOrWhiteSpace(context.Token))
+                {
+                    var authorizationHeader = context.Request.Headers.Authorization.ToString();
+                    if (!string.IsNullOrWhiteSpace(authorizationHeader))
+                    {
+                        const string bearerPrefix = "Bearer ";
+                        const string tokenPrefix = "Token ";
+
+                        if (authorizationHeader.StartsWith(bearerPrefix, StringComparison.OrdinalIgnoreCase))
+                        {
+                            context.Token = authorizationHeader.Substring(bearerPrefix.Length).Trim().Trim('"');
+                        }
+                        else if (authorizationHeader.StartsWith(tokenPrefix, StringComparison.OrdinalIgnoreCase))
+                        {
+                            // Some clients use "Token <jwt>" by mistake; treat it as JWT token anyway.
+                            context.Token = authorizationHeader.Substring(tokenPrefix.Length).Trim().Trim('"');
+                        }
+                    }
+                }
+
+                // 2) SignalR WebSocket query-string token support.
                 var path = context.HttpContext.Request.Path;
                 if (path.StartsWithSegments("/hubs/chat"))
                 {

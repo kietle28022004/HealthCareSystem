@@ -53,7 +53,7 @@ namespace Repositories.Repositories
                 Role = user.Role,
                 Token = token,
                 AvatarUrl = user.AvatarUrl,
-                ExpiresAt = DateTime.UtcNow.AddMinutes(15)
+                ExpiresAt = DateTime.UtcNow.AddHours(24)
             }; ;
         }
 
@@ -90,7 +90,7 @@ namespace Repositories.Repositories
                     Email = user.Email,
                     Role = user.Role,
                     Token = token,
-                    ExpiresAt = DateTime.UtcNow.AddMinutes(15)
+                    ExpiresAt = DateTime.UtcNow.AddHours(24)
                 };
             }
             catch (Exception ex)
@@ -98,6 +98,24 @@ namespace Repositories.Repositories
                 Console.WriteLine($"[ERROR] LoginGoogleAsync: {ex.Message}");
                 return null;
             }
+        }
+
+        public async Task<LoginResponse?> GetLoginResponseAsync(int userId)
+        {
+            var user = await UserDAO.GetUserById(userId);
+            if (user == null) return null;
+
+            var token = _tokenRepository.GenerateJwtToken(user);
+            return new LoginResponse
+            {
+                UserId = user.UserId,
+                FullName = user.FullName ?? "",
+                Email = user.Email,
+                Role = user.Role,
+                Token = token,
+                AvatarUrl = user.AvatarUrl,
+                ExpiresAt = DateTime.UtcNow.AddHours(24)
+            };
         }
 
         public async Task<RegisterResponse?> RegisterAsync(RegisterRequest request)
