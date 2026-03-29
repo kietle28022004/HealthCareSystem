@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -50,9 +51,9 @@ namespace Repositories.Repositories
                 UserId = user.UserId,
                 FullName = user.FullName ?? "",
                 Email = user.Email,
-                Role = user.Role,
+                Role = user.Role ?? "Patient",
                 Token = token,
-                AvatarUrl = user.AvatarUrl,
+                AvatarUrl = user.AvatarUrl ?? string.Empty,
                 ExpiresAt = DateTime.UtcNow.AddMinutes(15)
             }; ;
         }
@@ -61,6 +62,11 @@ namespace Repositories.Repositories
         {
             try
             {
+                if (request == null || string.IsNullOrWhiteSpace(request.IdToken) || string.IsNullOrWhiteSpace(_googleClientId))
+                {
+                    return null;
+                }
+
                 //  Xác minh idToken với Google
                 var settings = new GoogleJsonWebSignature.ValidationSettings
                 {
@@ -71,14 +77,35 @@ namespace Repositories.Repositories
 
                 //  Lấy email từ token
                 var email = payload.Email;
-                Console.WriteLine($"[Google Login] Email: {email}");
+                if (string.IsNullOrWhiteSpace(email))
+                {
+                    return null;
+                }
 
-                // Kiểm tra
+                // Kiểm tra tài khoản hiện có theo email
                 var user = await UserDAO.GetUserByEmail(email);
                 if (user == null)
                 {
-                    Console.WriteLine("[Google Login] Email chưa tồn tại trong hệ thống.");
-                    return null;
+                    // Auto-provision user mới khi đăng nhập Google lần đầu
+                    var displayName = string.IsNullOrWhiteSpace(payload.Name) ? email : payload.Name;
+                    var temporaryPassword = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+
+                    user = await UserDAO.CreateUserAsync(new User
+                    {
+                        Email = email,
+                        Password = temporaryPassword,
+                        FullName = displayName,
+                        Role = "Patient",
+                        AvatarUrl = payload.Picture,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow,
+                        IsActive = true
+                    });
+
+                    if (user == null)
+                    {
+                        return null;
+                    }
                 }
 
                 //Nếu tồn tại → sinh JWT token bình thường
@@ -87,10 +114,12 @@ namespace Repositories.Repositories
                 return new LoginResponse
                 {
                     UserId = user.UserId,
+                    FullName = user.FullName ?? email,
                     Email = user.Email,
-                    Role = user.Role,
+                    Role = user.Role ?? "Patient",
                     Token = token,
-                    ExpiresAt = DateTime.UtcNow.AddMinutes(15)
+                    ExpiresAt = DateTime.UtcNow.AddMinutes(15),
+                    AvatarUrl = user.AvatarUrl ?? string.Empty
                 };
             }
             catch (Exception ex)

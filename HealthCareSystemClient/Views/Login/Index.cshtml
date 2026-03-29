@@ -4,6 +4,19 @@
     var returnUrl = ViewData["ReturnUrl"] as string;
 }
 
+<style>
+    .auth-action-width {
+        width: min(100%, 400px);
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    #googleLoginDiv > div {
+        margin-left: auto;
+        margin-right: auto;
+    }
+</style>
+
 <div class="row justify-content-center align-items-center min-vh-100">
     <div class="col-md-6 col-lg-5">
         <div class="text-center mb-4">
@@ -42,13 +55,16 @@
                         <input type="checkbox" class="form-check-input" id="remember" name="remember">
                         <label class="form-check-label text-secondary" for="remember">Remember me</label>
                     </div>
-                    <button type="submit" class="btn btn-primary btn-lg w-100 mb-4">Sign In</button>
+                    <div class="auth-action-width mb-4">
+                        <button type="submit" class="btn btn-primary btn-lg w-100 mb-0">Sign In</button>
+                    </div>
                 </form>
-                <div id="googleLoginDiv" class="mb-4 text-center"></div>
+                <div id="googleLoginDiv" class="mb-4 auth-action-width"></div>
 
-                <form id="googleForm" method="post" asp-action="GoogleLogin">
+                <form id="googleForm" method="post" action="/auth/callback">
                     @Html.AntiForgeryToken()
                     <input type="hidden" id="GoogleToken" name="googleToken" />
+                    <input type="hidden" name="returnUrl" value="@returnUrl" />
                 </form>
                 <div class="text-center">
                     <p class="text-secondary mb-3">Don't have an account? <a asp-controller="Register" asp-action="Index" class="text-primary text-decoration-none fw-semibold">Create one</a></p>
@@ -65,18 +81,49 @@
 
     <script>
         window.onload = function () {
+            const googleClientId = "@(ViewData["GoogleClientId"] as string ?? string.Empty)";
+
+            if (!googleClientId) {
+                console.error("Missing Google OAuth Client ID. Set GoogleAuth:ClientId in client appsettings.");
+                return;
+            }
+
             google.accounts.id.initialize({
-                clien'xxxxxxxxxxxxxxxxxxxxxxxxxxxxx't_id: "809599261625-93g'xxxxxxxxxxxxxxxxxxxxxxxxxxxxx'hqc42jnj7515a4hk6vtlatqfde2be.apps.'xxxxxxxxxxxxxxxxxxxxxxxxxxxxx'googleusercontent.com",
+                client_id: googleClientId,
                 callback: handleCredentialResponse
             });
 
-            google.accounts.id.renderButton(
-                document.getElementById("googleLoginDiv"),
-                { theme: "outline", size: "large", text: "signin_with" }
-            );
+            const googleLoginContainer = document.getElementById("googleLoginDiv");
+
+            if (!googleLoginContainer) {
+                return;
+            }
+
+            const renderGoogleButton = () => {
+                const buttonWidth = Math.min(Math.floor(googleLoginContainer.clientWidth), 400);
+                googleLoginContainer.innerHTML = "";
+                google.accounts.id.renderButton(
+                    googleLoginContainer,
+                    {
+                        theme: "outline",
+                        size: "large",
+                        text: "signin_with",
+                        shape: "pill",
+                        logo_alignment: "left",
+                        width: buttonWidth
+                    }
+                );
+            };
+
+            renderGoogleButton();
+            window.addEventListener("resize", renderGoogleButton);
         };
 
         function handleCredentialResponse(response) {
+            if (!response || !response.credential) {
+                return;
+            }
+
             document.getElementById("GoogleToken").value = response.credential;
             document.getElementById("googleForm").submit();
         }

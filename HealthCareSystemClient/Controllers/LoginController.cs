@@ -13,11 +13,19 @@ namespace HealthCareSystemClient.Controllers
     {
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly ILogger<LoginController> _logger;
+        private readonly IConfiguration _configuration;
 
-        public LoginController(IHttpClientFactory httpClientFactory, ILogger<LoginController> logger)
+        public LoginController(IHttpClientFactory httpClientFactory, ILogger<LoginController> logger, IConfiguration configuration)
         {
             _httpClientFactory = httpClientFactory;
             _logger = logger;
+            _configuration = configuration;
+        }
+
+        private void SetLoginViewData(string? returnUrl)
+        {
+            ViewData["ReturnUrl"] = returnUrl;
+            ViewData["GoogleClientId"] = _configuration["GoogleAuth:ClientId"] ?? string.Empty;
         }
 
         [HttpGet]
@@ -28,7 +36,7 @@ namespace HealthCareSystemClient.Controllers
                 return RedirectToAction("Index", "Home");
             }
 
-            ViewData["ReturnUrl"] = returnUrl;
+            SetLoginViewData(returnUrl);
             return View(new LoginRequest());
         }
 
@@ -36,7 +44,7 @@ namespace HealthCareSystemClient.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Index(LoginRequest request, string? returnUrl = null)
         {
-            ViewData["ReturnUrl"] = returnUrl;
+            SetLoginViewData(returnUrl);
 
             if (!ModelState.IsValid)
             {
@@ -102,14 +110,17 @@ namespace HealthCareSystemClient.Controllers
         }
 
         [HttpPost]
+        [Route("/auth/callback")]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> GoogleLogin(string googleToken)
+        public async Task<IActionResult> AuthCallback(string googleToken, string? returnUrl = null)
         {
             var model = new LoginRequest();
+            SetLoginViewData(returnUrl);
+
             if (string.IsNullOrEmpty(googleToken))
             {
-                ModelState.AddModelError("", "Không nhận được Google Token.");
-                return RedirectToAction(nameof(Index));
+                ModelState.AddModelError(string.Empty, "Không nhận được Google Token.");
+                return View("Index", model);
             }
 
             try
@@ -137,8 +148,14 @@ namespace HealthCareSystemClient.Controllers
                     HttpContext.Session.SetString("FullName", loginResponse.FullName ?? loginResponse.Email);
                     HttpContext.Session.SetString("AccessToken", loginResponse.Token);
                     HttpContext.Session.SetString("TokenExpiry", loginResponse.ExpiresAt.ToString("O"));
+                    HttpContext.Session.SetString("AvatarUrl", loginResponse.AvatarUrl ?? "/images/default-user.png");
 
-                    var role = loginResponse.Role?.Trim().ToLower();
+                    if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+                    {
+                        return Redirect(returnUrl);
+                    }
+
+                    var role = loginResponse.Role?.Trim().ToLowerInvariant();
 
                     return role switch
                     {
@@ -150,7 +167,9 @@ namespace HealthCareSystemClient.Controllers
                 }
                 else
                 {
-                    ModelState.AddModelError(string.Empty, "Email không tồn tại trong hệ thống.");
+                    var errorBody = await response.Content.ReadAsStringAsync();
+                    _logger.LogWarning("Google login failed with status code {StatusCode}. Response body: {Body}", response.StatusCode, errorBody);
+                    ModelState.AddModelError(string.Empty, "Đăng nhập Google thất bại. Vui lòng thử lại.");
                 }
             }
             catch (Exception ex)
@@ -159,6 +178,13 @@ namespace HealthCareSystemClient.Controllers
                 ModelState.AddModelError(string.Empty, "Đã xảy ra lỗi hệ thống. Vui lòng thử lại.");
             }
             return View("Index", model);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> GoogleLogin(string googleToken, string? returnUrl = null)
+        {
+            return await AuthCallback(googleToken, returnUrl);
         }
 
         [HttpPost]

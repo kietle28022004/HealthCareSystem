@@ -43,13 +43,12 @@ namespace HealthcareSystemAPI.Controllers
             {
                 return BadRequest(ModelState);
             }
-            Console.WriteLine("Google login successful for email: " + request.IdToken);
 
             var result = await _service.LoginGoogleAsync(request);
 
             if (result == null)
             {
-                return Unauthorized(new { message = "Invalid email" });
+                return Unauthorized(new { message = "Google login failed" });
             }
             
             return Ok(result);

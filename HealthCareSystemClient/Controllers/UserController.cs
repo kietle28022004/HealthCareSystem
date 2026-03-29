@@ -565,33 +565,49 @@ namespace HealthCareSystemClient.Controllers
             ViewData["ActiveMenu"] = "Calendar";
             var currentUserId = HttpContext.Session.GetInt32("UserId");
             var client = _httpClientFactory.CreateClient("healthcaresystemapi");
-            var patientcurent = await client.GetAsync($"api/Patient/{currentUserId}");
-            if (!patientcurent.IsSuccessStatusCode) return View(new PatientProfileDTO());
-            var currentUser = await patientcurent.Content.ReadFromJsonAsync<PatientProfileDTO>();
-            ViewBag.CurrentUser = currentUser;
+            var model = new BookAppointmentViewModel();
 
             if (currentUserId == null)
             {
                 return RedirectToAction("Index", "Login");
             }
 
+            var patientcurent = await client.GetAsync($"api/Patient/{currentUserId}");
+            if (patientcurent.IsSuccessStatusCode)
+            {
+                var currentUser = await patientcurent.Content.ReadFromJsonAsync<PatientProfileDTO>();
+                ViewBag.CurrentUser = currentUser;
+            }
+            else
+            {
+                ViewBag.CurrentUser = new PatientProfileDTO();
+            }
+
             //var allAppointments = await _appointmentService.GetAllAppointmentsAsync();
 
+            var userAppointments = new List<AppointmentResponse>();
             var response = await client.GetAsync($"api/Appointment/patient/{currentUserId}");
-            if (!response.IsSuccessStatusCode) return View(new List<AppointmentResponse>());
-            var userAppointments = await response.Content.ReadFromJsonAsync<List<AppointmentResponse>>();
+            if (response.IsSuccessStatusCode)
+            {
+                userAppointments = await response.Content.ReadFromJsonAsync<List<AppointmentResponse>>();
+            }
 
-            var model = new BookAppointmentViewModel();
             var responsespecialy = await client.GetAsync($"api/Appointment/specialty");
-            if (!responsespecialy.IsSuccessStatusCode) return View(new List<Specialty>());
-            var sespecialy = await responsespecialy.Content.ReadFromJsonAsync<List<Specialty>>();
-            model.Specialties = sespecialy
-                .Select(s => new SpecialtyViewModel
-                {
-                    SpecialtyId = s.SpecialtyId,
-                    Name = s.Name,
-                    Description = s.Description
-                }).ToList();
+            if (responsespecialy.IsSuccessStatusCode)
+            {
+                var sespecialy = await responsespecialy.Content.ReadFromJsonAsync<List<Specialty>>();
+                model.Specialties = sespecialy
+                    .Select(s => new SpecialtyViewModel
+                    {
+                        SpecialtyId = s.SpecialtyId,
+                        Name = s.Name,
+                        Description = s.Description
+                    }).ToList();
+            }
+            else
+            {
+                model.Specialties = new List<SpecialtyViewModel>();
+            }
 
             // Prepare calendar data
             ViewBag.TodayAppointments = GetTodayAppointments(userAppointments);
